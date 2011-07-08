@@ -10,7 +10,7 @@ module Copilot.Compile.SBV.MetaTable
   , StreamInfoMap
   , ExternInfoMap
   , MetaTable (..)
---  , allocMetaTable
+  , allocMetaTable
   ) where
 
 import qualified Data.SBV as S

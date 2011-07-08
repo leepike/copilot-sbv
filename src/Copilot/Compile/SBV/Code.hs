@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 
 module Copilot.Compile.SBV.Code
-  ( 
+  ( schedule
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV (c2sExpr)
