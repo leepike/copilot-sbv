@@ -184,19 +184,22 @@ instance C.Op1 C2SOp1 where
 eta2 :: (a -> a -> a) -> (a -> a -> S.SBVCodeGen a)
 eta2 f = \a b -> return $ f a b
 
+eta2b :: (a -> a -> S.SBool) -> (a -> a -> S.SBVCodeGen (S.SBool))
+eta2b f = \a b -> return $ f a b
+
 instance C.Op2 C2SOp2 where
   and     = C2SOp2 $                                              eta2 (S.&&&)
   or      = C2SOp2 $                                              eta2 (S.|||)
   add   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    -> eta2 (+)
   sub   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    -> eta2 (-)
   mul   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    -> eta2 (*)
-  -- XXX need to generalize Core for Eq and Ord
-  -- eq    t = C2SOp2 $ case W.eqInst       t of W.EqInst         -> eta2 (S..==)
-  -- ne    t = C2SOp2 $ case W.eqInst       t of W.EqInst         -> eta2 (S../=)
-  -- le    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2 (S..<=)
-  -- ge    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2 (S..>=)
-  -- lt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2 (S..<)
-  -- gt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2 (S..>)
+
+  eq    t = C2SOp2 $ case W.eqInst       t of W.EqInst         -> eta2b (S..==)
+  ne    t = C2SOp2 $ case W.eqInst       t of W.EqInst         -> eta2b (S../=)
+  le    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2b (S..<=)
+  ge    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2b (S..>=)
+  lt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2b (S..<)
+  gt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        -> eta2b (S..>)
 
   div   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst -> eta2 (S.pDiv)
   mod   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst -> eta2 (S.pMod)
