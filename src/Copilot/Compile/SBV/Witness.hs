@@ -10,7 +10,7 @@ module Copilot.Compile.SBV.Witness
     SymWordInst(..)       , symWordInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
---  , PolynomialInst(..)    , polyInst
+  , PolynomialInst(..)    , polyInst
   , OrdInst(..)           , ordInst 
   , MergeableInst(..)     , mergeableInst 
   ) where
@@ -75,22 +75,22 @@ eqInst t =
 
 --------------------------------------------------------------------------------
 
--- data PolynomialInst a = S.Polynomial (S.SBV a) => PolynomialInst
+data PolynomialInst a = S.Polynomial (S.SBV a) => PolynomialInst
 
--- polyInst :: C.Type a -> PolynomialInst a
--- polyInst t =
---   case t of
---     C.Bool   p -> mkInst p PolynomialInst
---     C.Int8   p -> mkInst p PolynomialInst
---     C.Int16  p -> mkInst p PolynomialInst
---     C.Int32  p -> mkInst p PolynomialInst 
---     C.Int64  p -> mkInst p PolynomialInst
---     C.Word8  p -> mkInst p PolynomialInst
---     C.Word16 p -> mkInst p PolynomialInst
---     C.Word32 p -> mkInst p PolynomialInst
---     C.Word64 p -> mkInst p PolynomialInst
---     C.Float  _ -> error "OrdInst!" -- !! supress warning !!
---     C.Double _ -> error "OrdInst!" -- !! supress warning !!
+polyInst :: C.Type a -> PolynomialInst a
+polyInst t =
+  case t of
+    C.Bool   p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int8   p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int16  p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int32  p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int64  p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Word8  p -> mkInst p PolynomialInst
+    C.Word16 p -> mkInst p PolynomialInst
+    C.Word32 p -> mkInst p PolynomialInst
+    C.Word64 p -> mkInst p PolynomialInst
+    C.Float  _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Double _ -> error "PolynomialInst!" -- !! supress warning !!
 
 --------------------------------------------------------------------------------
 
