@@ -20,6 +20,6 @@ compile fileName spec =
   S.compileToCLib 
     Nothing 
     fileName 
-    [("sbv_f", schedule (allocMetaTable spec) spec)]
+    (schedule (allocMetaTable spec) spec)
 
 --------------------------------------------------------------------------------

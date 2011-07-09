@@ -16,6 +16,7 @@ module Copilot.Compile.SBV.Witness
   ) where
 
 import qualified Data.SBV as S
+import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality
 

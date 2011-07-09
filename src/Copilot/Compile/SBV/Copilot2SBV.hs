@@ -12,6 +12,7 @@ module Copilot.Compile.SBV.Copilot2SBV
 where
 
 import qualified Data.SBV as S
+import qualified Data.SBV.Internals as S
 
 import qualified Copilot.Compile.SBV.Queue as Q (lookahead)
 import Copilot.Compile.SBV.MetaTable
@@ -92,9 +93,9 @@ instance C.Expr C2SExpr where
         , streamInfoType  = t2
         } =
       let Just p = t2 =~= t1
-      in  undefined
--- XXXX
---coerce (cong p) (Q.lookahead (fromIntegral i) que)
+      in  undefined --do Q.lookahead (fromIntegral i) que 
+            
+--            return $ coerce (cong p) v
 
   ----------------------------------------------------
 
@@ -114,7 +115,7 @@ instance C.Expr C2SExpr where
           , localType    = t2
           } ->
             let Just p = t2 =~= t1
-            in  undefined -- XXX coerce (cong p) e
+            in  return $ coerce (cong p) e
 
   ----------------------------------------------------
 
@@ -162,22 +163,22 @@ instance C.Op1 C2SOp1 where
                        W.SymWordInst         -> eta1 abs 
   sign  t = C2SOp1 $ case W.symWordInst t of 
                        W.SymWordInst         -> eta1 signum
-  recip t = noFloatOpsErr "recip"
-  exp   t = noFloatOpsErr "exp"
-  sqrt  t = noFloatOpsErr "sqrt"
-  log   t = noFloatOpsErr "log"
-  sin   t = noFloatOpsErr "sin"
-  tan   t = noFloatOpsErr "tan"
-  cos   t = noFloatOpsErr "cos"
-  asin  t = noFloatOpsErr "asin"
-  atan  t = noFloatOpsErr "atan"
-  acos  t = noFloatOpsErr "acos"
-  sinh  t = noFloatOpsErr "sinh"
-  tanh  t = noFloatOpsErr "tanh"
-  cosh  t = noFloatOpsErr "cosh"
-  asinh t = noFloatOpsErr "asinh"
-  atanh t = noFloatOpsErr "atanh"
-  acosh t = noFloatOpsErr "acosh"
+  recip _ = noFloatOpsErr "recip"
+  exp   _ = noFloatOpsErr "exp"
+  sqrt  _ = noFloatOpsErr "sqrt"
+  log   _ = noFloatOpsErr "log"
+  sin   _ = noFloatOpsErr "sin"
+  tan   _ = noFloatOpsErr "tan"
+  cos   _ = noFloatOpsErr "cos"
+  asin  _ = noFloatOpsErr "asin"
+  atan  _ = noFloatOpsErr "atan"
+  acos  _ = noFloatOpsErr "acos"
+  sinh  _ = noFloatOpsErr "sinh"
+  tanh  _ = noFloatOpsErr "tanh"
+  cosh  _ = noFloatOpsErr "cosh"
+  asinh _ = noFloatOpsErr "asinh"
+  atanh _ = noFloatOpsErr "atanh"
+  acosh _ = noFloatOpsErr "acosh"
 
 ----------------------------------------------------
 
@@ -204,9 +205,9 @@ instance C.Op2 C2SOp2 where
   div   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst -> eta2 (S.pDiv)
   mod   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst -> eta2 (S.pMod)
 
-  fdiv  t = noFloatOpsErr "fdiv"
-  pow   t = noFloatOpsErr "pow"
-  logb  t = noFloatOpsErr "logb"
+  fdiv  _ = noFloatOpsErr "fdiv"
+  pow   _ = noFloatOpsErr "pow"
+  logb  _ = noFloatOpsErr "logb"
 
 instance C.Op3 C2SOp3 where
   mux t = C2SOp3 $ 
