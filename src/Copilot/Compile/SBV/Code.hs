@@ -66,8 +66,8 @@ schedule meta spec =
 --    required.  
 --  sampleExterns meta >>
     updateStates    meta spec ++
-    fireTriggers    meta spec ++
-    updateBuffers   meta spec
+    fireTriggers    meta spec 
+--    updateBuffers   meta spec
 
 --------------------------------------------------------------------------------
 
@@ -101,12 +101,11 @@ updateStates meta (C.Spec streams _ _) =
       let Just strmInfo = M.lookup id (streamInfoMap meta)
       updateStreamState1 t1 e' strmInfo
 
-  updateStreamState1 :: 
-    C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
+  updateStreamState1 :: C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
   updateStreamState1 t1 e1 (StreamInfo _ _ t2) = do
     W.SymWordInst <- return (W.symWordInst t2)
     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t2)
-    Just p       <- return (t1 =~= t2)
+    Just p <- return (t1 =~= t2)
     S.cgReturn $ coerce (cong p) e1
 
 {-
@@ -174,22 +173,25 @@ fireTriggers meta (C.Spec _ _ triggers) =
 
 --------------------------------------------------------------------------------
 
-updateBuffers :: MetaTable -> C.Spec -> CUnits
-updateBuffers meta (C.Spec streams _ _) = 
-  map updateBuffer streams
+-- XXX
+-- updateBuffers :: MetaTable -> C.Spec -> CUnits
+-- updateBuffers meta (C.Spec streams _ _) = 
+--   map updateBuffer streams
 
-  where
+--   where
 
-  updateBuffer :: C.Stream -> CUnit
-  updateBuffer C.Stream { C.streamId = id } =
-    let Just strmInfo = M.lookup id (streamInfoMap meta)
-    in  mkCUnit ("update_buffer_" ++ show id) (updateBuffer1 strmInfo)
+--   updateBuffer :: C.Stream -> CUnit
+--   updateBuffer C.Stream { C.streamId = id } =
+--     let Just strmInfo = M.lookup id (streamInfoMap meta) in
+--     mkCUnit ("update_buffer_" ++ show id) (updateBuffer1 strmInfo)
 
-  updateBuffer1 :: StreamInfo -> S.SBVCodeGen ()
-  updateBuffer1 (StreamInfo queue tmpVar t) = do
-    W.SymWordInst <- return (W.symWordInst t)
-    W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-    input <- S.cgInput tmpVar
-    Q.dropFirstElemAndSnoc input queue
+  -- XXX
+  -- updateBuffer1 :: StreamInfo -> S.SBVCodeGen ()
+  -- updateBuffer1 (StreamInfo queue tmpVar t) = do
+  --   W.SymWordInst <- return (W.symWordInst t)
+  --   W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+--    input <- S.cgInput tmpVar
+--   XXX
+--    Q.dropFirstElemAndSnoc queue
 
 --------------------------------------------------------------------------------

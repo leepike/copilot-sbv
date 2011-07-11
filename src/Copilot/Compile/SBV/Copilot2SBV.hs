@@ -93,9 +93,11 @@ instance C.Expr C2SExpr where
         , streamInfoType  = t2
         } =
       let Just p = t2 =~= t1
-      in  undefined --do Q.lookahead (fromIntegral i) que 
-            
---            return $ coerce (cong p) v
+      in  do W.SymWordInst <- return $ W.symWordInst t2
+             W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
+             q   <- que
+             idx <- Q.lookahead i q
+             return $ coerce (cong p) idx
 
   ----------------------------------------------------
 
@@ -119,10 +121,10 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  extern t name = C2SExpr $ \ _ _ -> 
-    case W.symWordInst t of 
-      W.SymWordInst -> case W.hasSignAndSizeInst t of
-                         W.HasSignAndSizeInst -> S.cgInput name
+  extern t name = C2SExpr $ \ _ _ -> do
+    W.SymWordInst <- return (W.symWordInst t)
+    W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+    S.cgInput name
 
   ----------------------------------------------------
 

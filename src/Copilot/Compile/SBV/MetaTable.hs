@@ -21,7 +21,6 @@ import qualified Copilot.Compile.SBV.Witness as W
 import qualified Copilot.Core as C
 import Copilot.Core.Spec.Externals (Extern (..), externals)
 
-import Control.Monad (liftM)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Prelude hiding (id)
@@ -29,7 +28,7 @@ import Prelude hiding (id)
 --------------------------------------------------------------------------------
 
 data StreamInfo = forall a . StreamInfo
-  { streamInfoQueue   :: Q.Queue a
+  { streamInfoQueue   :: S.SBVCodeGen (Q.Queue a)
   , streamInfoTempVar :: Var a
   , streamInfoType    :: C.Type a }
 
@@ -66,7 +65,7 @@ allocStream
     , C.streamBuffer   = buf
     , C.streamExprType = t
     } =
-    let que = Q.queue (mkQueueName id) buf in
+    let que = Q.queue t (mkQueueName id) buf in
     let tmp = var (mkTempVarName id) (C.uninitialized t) in
     let
       strmInfo =
@@ -89,7 +88,7 @@ mkExternName :: C.Name -> String
 mkExternName name = "ext_" ++ name
 
 mkQueueName :: C.Id -> String
-mkQueueName id = "str" ++ show id
+mkQueueName id = show id
 
 mkTempVarName :: C.Id -> String
 mkTempVarName id = "tmp" ++ show id
