@@ -24,33 +24,10 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Prelude hiding (id)
 
--- fib0 :: S.SWord64 -> S.SWord64
--- fib0 n = S.ite 
---            (n S..== 0 S.||| n S..== 1)
---            n
---            (fib0 (n-1) + fib0 (n-2))
-
--- foo :: S.SWord64
--- foo = S.literal 3 + 4
--- fib :: Stream Word64
--- fib = [1, 1] ++ fib + drop 1 fib
-
 --------------------------------------------------------------------------------
 
 c2sExpr :: MetaTable -> (forall e . C.Expr e => e a) -> S.SBVCodeGen (S.SBV a)
 c2sExpr meta e = c2sExpr_ e M.empty meta
-
---------------------------------------------------------------------------------
-
--- c2SType :: C.Type a -> S.Type
--- c2SType t =
---   case t of
---     C.Bool   _ -> S.SBool
-    -- C.Int8   _ -> A.Int8   ; C.Int16  _ -> A.Int16
-    -- C.Int32  _ -> A.Int32  ; C.Int64  _ -> A.Int64
-    -- C.Word8  _ -> A.Word8  ; C.Word16 _ -> A.Word16
-    -- C.Word32 _ -> A.Word32 ; C.Word64 _ -> A.Word64
-    -- C.Float  _ -> A.Float  ; C.Double _ -> A.Double
 
 --------------------------------------------------------------------------------
 
@@ -95,8 +72,7 @@ instance C.Expr C2SExpr where
       let Just p = t2 =~= t1
       in  do W.SymWordInst <- return $ W.symWordInst t2
              W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
-             q   <- que
-             idx <- Q.lookahead i q
+             idx <- Q.lookahead i que
              return $ coerce (cong p) idx
 
   ----------------------------------------------------
@@ -121,10 +97,16 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  extern t name = C2SExpr $ \ _ _ -> do
-    W.SymWordInst <- return (W.symWordInst t)
-    W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-    S.cgInput name
+  extern t name = C2SExpr $ \ _ meta -> 
+    let Just varInfo = M.lookup name (externInfoMap meta) in
+    getSBV t varInfo
+    where 
+    getSBV :: C.Type a -> ExternInfo -> S.SBVCodeGen (S.SBV a)
+    getSBV t1 ExternInfo { externInfoSBV = sbvInput
+                         , externInfoType = t2 } = do 
+      Just p <- return (t2 =~= t1)
+      v <- sbvInput
+      return (coerce (cong p) v) 
 
   ----------------------------------------------------
 
