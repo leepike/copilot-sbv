@@ -43,7 +43,7 @@ type SBVFunc  = (String, S.SBVCodeGen ())
 --------------------------------------------------------------------------------
 
 -- sampleExterns :: MetaTable -> S.SBVCodeGen ()
--- sampleExterns = undefined
+-- sampleExterns = 
   -- mapM_ sampleExtern . M.toList . externInfoMap
 
   -- where
@@ -67,15 +67,17 @@ updateStates meta (C.Spec streams _ _) =
   mkSBVFunc str codeGen = (str, codeGen)
 
   updateStreamState :: C.Stream -> SBVFunc
-  updateStreamState (C.Stream id _  _ e t1) =
+  updateStreamState C.Stream { C.streamId       = id
+                             , C.streamExpr     = e
+                             , C.streamExprType = t1
+                             }                        =
     mkSBVFunc (mkUpdateStFunc (show id)) $
-    do
-      e' <- c2sExpr meta e
-      let Just strmInfo = M.lookup id (streamInfoMap meta)
-      updateStreamState1 t1 e' strmInfo
+    do e' <- c2sExpr meta e
+       let Just strmInfo = M.lookup id (streamInfoMap meta)
+       updateStreamState1 t1 e' strmInfo
 
   updateStreamState1 :: C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
-  updateStreamState1 t1 e1 (StreamInfo _ t2) = do
+  updateStreamState1 t1 e1 (StreamInfo _ _ t2) = do
     W.SymWordInst <- return (W.symWordInst t2)
     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t2)
     Just p <- return (t1 =~= t2)

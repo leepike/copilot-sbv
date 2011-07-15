@@ -5,7 +5,7 @@
 -- | Implements queues holding stream values.
 
 module Copilot.Compile.SBV.Queue
-  ( Queue
+  ( Queue(..)
 --  , dropFirstElemAndSnoc
   , lookahead
   -- , size
@@ -61,17 +61,16 @@ lookahead i (Queue sbvBuf ptr sz) = do
 
 queue :: C.Type a -> String -> [a] -> Queue a
 queue t name xs = 
-  let sz = fromIntegral (length xs) in
-  let p  = S.cgInput (mkQueuePtrVar name) in
+  let sz  = fromIntegral (length xs) in
+  let p   = S.cgInput (mkQueuePtrVar name) in
   let buf = do W.SymWordInst        <- return (W.symWordInst t)
                W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
                arr <- S.cgInputArr sz (mkQueueVar name)
                Just p_ <- return (t =~= t)
                return $ map (coerce (cong p_)) arr
-  in
-  Queue { queueRingBuffer = buf
-        , queuePointer    = p
-        , size            = sz }
+  in Queue { queueRingBuffer = buf
+           , queuePointer    = p
+           , size            = sz } 
 
 --   -- W.SymWordInst        <- return (W.symWordInst t)
 --   -- W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)

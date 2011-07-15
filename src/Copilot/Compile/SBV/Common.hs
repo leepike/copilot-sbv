@@ -3,28 +3,33 @@
 --------------------------------------------------------------------------------
 
 module Copilot.Compile.SBV.Common
-  ( Var
-  , var
-  , mkTmpStVar
+  ( --Var
+--  , var
+  mkTmpStVar
   , mkUpdateStFunc
   , mkQueueVar
   , mkQueuePtrVar
+  , mkExtTmpVar
   ) where
 
-type Var a = String
+--type Var a = String
 
-var :: String -> a -> Var a
-var name _ = name 
+-- XXX put all mkvar names in one place and carry them around in MetaTable?
+
+-- var :: String -> a -> Var a
+-- var name _ = name 
 
 mkTmpStVar :: String -> String
-mkTmpStVar name = "tmp_" ++ name
+mkTmpStVar = ("tmp_" ++)
 
 mkUpdateStFunc :: String -> String
-mkUpdateStFunc name = "update_state_" ++ name
+mkUpdateStFunc = ("update_state_" ++)
 
 mkQueueVar :: String -> String
-mkQueueVar name = "queue_" ++ name 
+mkQueueVar = ("queue_" ++)
 
 mkQueuePtrVar :: String -> String
-mkQueuePtrVar name = "ptr_" ++ name
+mkQueuePtrVar = ("ptr_" ++)
 
+mkExtTmpVar :: String -> String
+mkExtTmpVar = ("ext_" ++)

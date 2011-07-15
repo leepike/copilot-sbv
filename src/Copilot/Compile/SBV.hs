@@ -21,7 +21,7 @@ compile :: String -> C.Spec -> IO ()
 compile fileName spec = do 
   let meta = allocMetaTable spec
 
-  putStrLn "Compiling ..."
+  putStrLn "Compiling SBV-generated functions..."
 
   S.compileToCLib 
     Nothing 

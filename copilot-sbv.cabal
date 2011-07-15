@@ -27,6 +27,7 @@ library
                           , base >= 4.3
                           , containers >= 0.4
                           , copilot-core
+                          , pretty >= 1                         
 
   exposed-modules         : Copilot.Compile.SBV
                           , Copilot.Compile.SBV.Code
@@ -35,3 +36,4 @@ library
                           , Copilot.Compile.SBV.MetaTable
                           , Copilot.Compile.SBV.Queue
                           , Copilot.Compile.SBV.Witness
+                          , Copilot.Compile.SBV.Driver
