@@ -19,6 +19,7 @@ import Copilot.Compile.SBV.Queue
 --import Copilot.Compile.SBV.Common
 import Copilot.Compile.SBV.MetaTable
 import Copilot.Compile.SBV.Common
+import Copilot.Compile.SBV.Copilot2SBV
 
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
@@ -36,7 +37,7 @@ driver meta spec =
     $$ declareVars meta 
     $$ sampleExts meta 
     $$ updateStates meta spec
-    $$ fireTrigger undefined meta 
+    $$ fireTriggers undefined meta 
     $$ updateBuffers meta  
     $$ updatePtrs meta 
     $$ mkMain  
@@ -56,30 +57,57 @@ declareVars MetaTable { streamInfoMap = strMap
 --------------------------------------------------------------------------------
 
 sampleExts :: MetaTable -> Doc
-sampleExts MetaTable { streamInfoMap = strMap
-                     , externInfoMap = extMap } = undefined 
---  mkFunc "sampleExts" $ vcat 
+sampleExts MetaTable { externInfoMap = extMap } = 
+  mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap) 
+
+  where
+  -- extVar = var;
+  sampleExt :: C.Name -> Doc
+  sampleExt name = text (mkExtTmpVar name) <+> equals <+> text name <> semi
+
 --------------------------------------------------------------------------------
 
 updateStates :: MetaTable -> C.Spec -> Doc
-updateStates MetaTable { streamInfoMap = strMap } spec = undefined
-  -- mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
+updateStates MetaTable { streamInfoMap = strMap } spec = 
+  mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
 
-  -- where 
-  -- -- tmp_X = updateState(arg0, arg1, ... );
-  -- updateSt :: (C.Id, StreamInfo) -> Doc
-  -- updateSt = (id, StreamInfo { XXX = YYY } = undefined
-  --   text mkTmpStVar <+> equals <+> 
-  --     lparen <> args (map text XXX) <> 
-  --     rparen <> semi
+  where 
+  -- tmp_X = updateState(arg0, arg1, ... );
+  updateSt :: (C.Id, StreamInfo) -> Doc
+  updateSt (id, StreamInfo { streamFnInputs = args }) =
+    text (mkTmpStVar id) <+> equals <+> 
+      lparen <> mkArgs (map text args) <> 
+      rparen <> semi
 
-  -- mkArgs :: [Doc] -> Doc
-  -- mkArgs = punctuate (comma <+>)
+  mkArgs :: [Doc] -> Doc
+  mkArgs args = hsep (punctuate comma args)
 
 --------------------------------------------------------------------------------
 
-fireTrigger :: [C.Trigger] -> MetaTable -> Doc
-fireTrigger triggers meta = undefined
+fireTriggers :: [C.Trigger] -> MetaTable -> Doc
+fireTriggers triggers meta = 
+  mkFunc triggersF $ vcat $ map fireTrig triggers
+
+  where
+  -- if (guard) trigger(args);
+  fireTrig :: C.Trigger -> Doc
+  fireTrig C.Trigger { C.triggerName  = name
+                     , C.triggerGuard = guard
+                     , C.triggerArgs  = args } =
+    text "if" <+> lparen <> mkGuard guard <> rparen <+> 
+      text name <> lparen <> sep (map mkArg args) <> rparen <> semi
+
+  mkGuard :: C2SExpr Bool -> Doc
+  mkGuard guard = --do
+--    e <- c2sExpr meta guard
+    undefined
+
+  mkArg :: C.TriggerArg -> Doc
+  mkArg C.TriggerArg { C.triggerArgExpr = e
+                     , C.triggerArgType = t } = undefined
+ 
+  sep :: [Doc] -> Doc
+  sep  args = hsep (punctuate comma args)
 
 --------------------------------------------------------------------------------
 
@@ -90,9 +118,7 @@ updateBuffers MetaTable { streamInfoMap = strMap } =
   where
   updateBuf :: (C.Id, StreamInfo) -> Doc
   updateBuf (id, StreamInfo { streamInfoQueue = queue }) =
-    updateFunc (mkQueueVar idStr) (mkQueuePtrVar idStr) (mkTmpStVar idStr)
-    where idStr :: String
-          idStr = show id
+    updateFunc (mkQueueVar id) (mkQueuePtrVar id) (mkTmpStVar id)
 
   -- queue_strX[ptr] = newVal;
   updateFunc :: String -> String -> String -> Doc
@@ -108,7 +134,7 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
   where 
   varAndUpdate :: (C.Id, StreamInfo) -> Doc
   varAndUpdate (id, StreamInfo { streamInfoQueue = queue }) =
-    updateFunc ( mkQueuePtrVar (show id)
+    updateFunc ( mkQueuePtrVar id
                , getSize queue)
 
   getSize :: Queue a -> Int
@@ -123,7 +149,7 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
 -- | The main.
 mkMain :: Doc
-mkMain = undefined    
+mkMain = mkFunc "main" $ vcat $ undefined
 
 --------------------------------------------------------------------------------
 
@@ -135,7 +161,9 @@ mkFunc fnName doc =
 
 --------------------------------------------------------------------------------
 
-updatePtrsF, updateBuffersF, updateStatesF :: String
+sampleExtsF, triggersF, updatePtrsF, updateBuffersF, updateStatesF :: String
 updatePtrsF    = "updatePtrs"
 updateBuffersF = "updateBuffers"
 updateStatesF  = "updateStates"
+triggersF      = "fireTriggers"
+sampleExtsF    = "sampleExts"

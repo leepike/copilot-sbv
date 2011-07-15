@@ -70,8 +70,8 @@ updateStates meta (C.Spec streams _ _) =
   updateStreamState C.Stream { C.streamId       = id
                              , C.streamExpr     = e
                              , C.streamExprType = t1
-                             }                        =
-    mkSBVFunc (mkUpdateStFunc (show id)) $
+                                                      } =
+    mkSBVFunc (mkUpdateStFunc id) $
     do e' <- c2sExpr meta e
        let Just strmInfo = M.lookup id (streamInfoMap meta)
        updateStreamState1 t1 e' strmInfo

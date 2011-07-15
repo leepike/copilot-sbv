@@ -20,7 +20,7 @@ import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
 import Copilot.Core.Expr (DropIdx)
-import qualified Copilot.Core as C (Type)
+import qualified Copilot.Core as C (Type, Id)
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 --------------------------------------------------------------------------------
@@ -59,13 +59,13 @@ lookahead i (Queue sbvBuf ptr sz) = do
   let defaultVal = if null buf then error "lookahead error" else head buf
   return $ S.select buf defaultVal k
 
-queue :: C.Type a -> String -> [a] -> Queue a
-queue t name xs = 
+queue :: C.Type a -> C.Id -> [a] -> Queue a
+queue t id xs = 
   let sz  = fromIntegral (length xs) in
-  let p   = S.cgInput (mkQueuePtrVar name) in
+  let p   = S.cgInput (mkQueuePtrVar id) in
   let buf = do W.SymWordInst        <- return (W.symWordInst t)
                W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-               arr <- S.cgInputArr sz (mkQueueVar name)
+               arr <- S.cgInputArr sz (mkQueueVar id)
                Just p_ <- return (t =~= t)
                return $ map (coerce (cong p_)) arr
   in Queue { queueRingBuffer = buf

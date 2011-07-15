@@ -12,6 +12,9 @@ module Copilot.Compile.SBV.Common
   , mkExtTmpVar
   ) where
 
+import Copilot.Core (Id)
+
+
 --type Var a = String
 
 -- XXX put all mkvar names in one place and carry them around in MetaTable?
@@ -19,17 +22,20 @@ module Copilot.Compile.SBV.Common
 -- var :: String -> a -> Var a
 -- var name _ = name 
 
-mkTmpStVar :: String -> String
-mkTmpStVar = ("tmp_" ++)
+mkVar :: String -> Id -> String
+mkVar str id = str ++ show id
 
-mkUpdateStFunc :: String -> String
-mkUpdateStFunc = ("update_state_" ++)
+mkTmpStVar :: Id -> String
+mkTmpStVar = mkVar "tmp_"
 
-mkQueueVar :: String -> String
-mkQueueVar = ("queue_" ++)
+mkUpdateStFunc :: Id -> String
+mkUpdateStFunc = mkVar "update_state_" 
 
-mkQueuePtrVar :: String -> String
-mkQueuePtrVar = ("ptr_" ++)
+mkQueueVar :: Id -> String
+mkQueueVar = mkVar "queue_" 
+
+mkQueuePtrVar :: Id -> String
+mkQueuePtrVar = mkVar "ptr_" 
 
 mkExtTmpVar :: String -> String
 mkExtTmpVar = ("ext_" ++)

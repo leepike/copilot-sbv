@@ -71,7 +71,7 @@ allocStream C.Stream
               , C.streamExpr     = e
               , C.streamExprType = t
               } =
-  let que = Q.queue t (mkQueueVar (show id)) buf in
+  let que = Q.queue t id buf in
 --    let tmp = mkTmpStVar (show id)  in
   let
     strmInfo =
@@ -113,8 +113,8 @@ newtype C2Args a = C2Args
 instance C.Expr C2Args where
   const _ _ = C2Args [] 
 
-  drop _ _ id = C2Args [ mkQueuePtrVar (show id)
-                       , mkQueueVar (show id) ]
+  drop _ _ id = C2Args [ mkQueuePtrVar id
+                       , mkQueueVar id ]
  
   local _ _ _ e1 e2 = 
     C2Args $ c2Args e1 ++ c2Args e2
