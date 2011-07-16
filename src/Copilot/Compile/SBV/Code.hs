@@ -4,12 +4,13 @@
 
 module Copilot.Compile.SBV.Code
   ( updateStates
+  , fireTriggers
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV (c2sExpr)
 import Copilot.Compile.SBV.MetaTable
   (MetaTable (..), StreamInfo (..)) -- XXX , ExternInfo (..))
-import qualified Copilot.Compile.SBV.Queue as Q
+--import qualified Copilot.Compile.SBV.Queue as Q
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
@@ -25,6 +26,9 @@ import Prelude hiding (id)
 --------------------------------------------------------------------------------
 
 type SBVFunc  = (String, S.SBVCodeGen ())
+
+mkSBVFunc :: String -> S.SBVCodeGen () -> (String, S.SBVCodeGen ())
+mkSBVFunc str codeGen = (str, codeGen)
 
 --type SBVFuncs = [SBVFunc]
 
@@ -60,18 +64,15 @@ type SBVFunc  = (String, S.SBVCodeGen ())
 
 updateStates :: MetaTable -> C.Spec -> [SBVFunc]
 updateStates meta (C.Spec streams _ _) = 
-  do map updateStreamState streams
+  map updateStreamState streams
         
   where
-  mkSBVFunc :: String -> S.SBVCodeGen () -> (String, S.SBVCodeGen ())
-  mkSBVFunc str codeGen = (str, codeGen)
-
   updateStreamState :: C.Stream -> SBVFunc
   updateStreamState C.Stream { C.streamId       = id
                              , C.streamExpr     = e
                              , C.streamExprType = t1
                                                       } =
-    mkSBVFunc (mkUpdateStFunc id) $
+    mkSBVFunc (mkUpdateStFn id) $
     do e' <- c2sExpr meta e
        let Just strmInfo = M.lookup id (streamInfoMap meta)
        updateStreamState1 t1 e' strmInfo
@@ -84,6 +85,42 @@ updateStates meta (C.Spec streams _ _) =
     S.cgReturn $ coerce (cong p) e1
 
 --------------------------------------------------------------------------------
+
+fireTriggers :: MetaTable -> C.Spec -> [SBVFunc] 
+fireTriggers meta (C.Spec _ _ triggers) = 
+  concatMap fireTrig triggers
+
+  where
+  fireTrig :: C.Trigger -> [SBVFunc]
+  fireTrig C.Trigger { C.triggerName  = name
+                     , C.triggerGuard = guard
+                     , C.triggerArgs  = args } =
+      mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
+    : map (mkTriggerArg name) (zip [0,1 ..] args)
+    where 
+    mkSBVExp = do 
+      e <- c2sExpr meta guard
+      S.cgReturn e 
+
+  mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
+  mkTriggerArg name (i, C.TriggerArg { C.triggerArgExpr = e
+                                     , C.triggerArgType = t } ) = 
+    mkSBVFunc (mkTriggerArgFn i name) mkExpr
+    where  
+    mkExpr = do
+      e' <- c2sExpr meta e
+      W.SymWordInst <- return (W.symWordInst t)
+      W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+      Just p <- return (t =~= t) 
+      S.cgReturn $ coerce (cong p) e'
+        
+  -- mkSBVExp :: C.Expr e => e Bool -> S.SBVCodeGen ()
+  -- mkSBVExp e = do 
+  --   e' <- c2sExpr meta e
+  --   S.cgReturn e' -- $ coerce (cong (C.Bool True)) e'
+
+--mkSBVFunc ("trigger_guard_" ++ name) 
+  
 
 -- fireTriggers :: MetaTable -> C.Spec -> SBVFuncs
 -- fireTriggers meta (C.Spec _ _ triggers) =

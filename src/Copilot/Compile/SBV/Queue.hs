@@ -23,6 +23,8 @@ import Copilot.Core.Expr (DropIdx)
 import qualified Copilot.Core as C (Type, Id)
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
+import Prelude hiding (id)
+
 --------------------------------------------------------------------------------
 type QueueSize = S.SWord8
 

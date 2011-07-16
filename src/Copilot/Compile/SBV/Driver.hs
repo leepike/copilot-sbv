@@ -15,16 +15,17 @@ module Copilot.Compile.SBV.Driver
 
 import qualified Data.Map as M
 import Text.PrettyPrint.HughesPJ
-import Copilot.Compile.SBV.Queue
+--import Copilot.Compile.SBV.Queue
 --import Copilot.Compile.SBV.Common
 import Copilot.Compile.SBV.MetaTable
 import Copilot.Compile.SBV.Common
-import Copilot.Compile.SBV.Copilot2SBV
+--import Copilot.Compile.SBV.Copilot2SBV
 
-import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
+--import qualified Data.SBV as S
+--import qualified Data.SBV.Internals as S
 
 import qualified Copilot.Core as C
+import Prelude hiding (id)
 
 --------------------------------------------------------------------------------
 
@@ -46,13 +47,13 @@ driver meta spec =
 
 preCode :: MetaTable -> Doc
 preCode MetaTable { streamInfoMap = strMap
-                  , externInfoMap = extMap } = undefined
+                  , externInfoMap = extMap } = empty
 
 --------------------------------------------------------------------------------
 
 declareVars :: MetaTable -> Doc
 declareVars MetaTable { streamInfoMap = strMap
-                      , externInfoMap = extMap } = undefined
+                      , externInfoMap = extMap } = empty
 
 --------------------------------------------------------------------------------
 
@@ -75,7 +76,7 @@ updateStates MetaTable { streamInfoMap = strMap } spec =
   -- tmp_X = updateState(arg0, arg1, ... );
   updateSt :: (C.Id, StreamInfo) -> Doc
   updateSt (id, StreamInfo { streamFnInputs = args }) =
-    text (mkTmpStVar id) <+> equals <+> 
+    text (mkTmpStVar id) <+> equals <+> text (mkUpdateStFn id) <>
       lparen <> mkArgs (map text args) <> 
       rparen <> semi
 
@@ -94,13 +95,12 @@ fireTriggers triggers meta =
   fireTrig C.Trigger { C.triggerName  = name
                      , C.triggerGuard = guard
                      , C.triggerArgs  = args } =
-    text "if" <+> lparen <> mkGuard guard <> rparen <+> 
+    text "if" <+> lparen <> mkGuard name <> rparen <+> 
       text name <> lparen <> sep (map mkArg args) <> rparen <> semi
 
-  mkGuard :: C2SExpr Bool -> Doc
-  mkGuard guard = --do
---    e <- c2sExpr meta guard
-    undefined
+  -- guard(arg0, arg1, ...)
+  mkGuard :: String -> Doc
+  mkGuard name = text (mkTriggerGuardFn name) <> lparen <> undefined <> rparen
 
   mkArg :: C.TriggerArg -> Doc
   mkArg C.TriggerArg { C.triggerArgExpr = e
@@ -117,13 +117,14 @@ updateBuffers MetaTable { streamInfoMap = strMap } =
 
   where
   updateBuf :: (C.Id, StreamInfo) -> Doc
-  updateBuf (id, StreamInfo { streamInfoQueue = queue }) =
+--  updateBuf (id, StreamInfo { streamInfoQueue = que }) =
+  updateBuf (id, _) =
     updateFunc (mkQueueVar id) (mkQueuePtrVar id) (mkTmpStVar id)
 
   -- queue_strX[ptr] = newVal;
   updateFunc :: String -> String -> String -> Doc
-  updateFunc queue ptr tmp =
-    text queue <> lbrack <> text ptr <> rbrack <+> equals <+> text tmp <> semi
+  updateFunc que ptr tmp =
+    text que <> lbrack <> text ptr <> rbrack <+> equals <+> text tmp <> semi
 
 --------------------------------------------------------------------------------
 
@@ -133,16 +134,16 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
   where 
   varAndUpdate :: (C.Id, StreamInfo) -> Doc
-  varAndUpdate (id, StreamInfo { streamInfoQueue = queue }) =
-    updateFunc ( mkQueuePtrVar id
-               , getSize queue)
+--  varAndUpdate (id, StreamInfo { streamInfoQueue = queue }) =
+  varAndUpdate (id, _) =
+    updateFunc (mkQueuePtrVar id)
 
-  getSize :: Queue a -> Int
-  getSize Queue { size = sz } = sz
+  -- getSize :: Queue a -> Int
+  -- getSize Queue { size = sz } = sz
 
   -- idx += 1;
-  updateFunc :: (String, Int) -> Doc
-  updateFunc (ptr, sz) =
+  updateFunc :: String -> Doc
+  updateFunc ptr =
     text ptr <+> equals <> text "+" <+> int 1 <> semi
 
 --------------------------------------------------------------------------------

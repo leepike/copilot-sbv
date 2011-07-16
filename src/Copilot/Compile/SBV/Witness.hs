@@ -81,11 +81,11 @@ data PolynomialInst a = S.Polynomial (S.SBV a) => PolynomialInst
 polyInst :: C.Type a -> PolynomialInst a
 polyInst t =
   case t of
-    C.Bool   p -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int8   p -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int16  p -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int32  p -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int64  p -> error "PolynomialInst!" -- !! supress warning !!
+    C.Bool   _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int8   _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int16  _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int32  _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Int64  _ -> error "PolynomialInst!" -- !! supress warning !!
     C.Word8  p -> mkInst p PolynomialInst
     C.Word16 p -> mkInst p PolynomialInst
     C.Word32 p -> mkInst p PolynomialInst
