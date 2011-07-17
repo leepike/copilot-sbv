@@ -14,7 +14,7 @@ import qualified Data.SBV as S
 import Copilot.Compile.SBV.Driver (driver)
 import Copilot.Compile.SBV.Code (updateStates, fireTriggers)
 import Copilot.Compile.SBV.MetaTable (allocMetaTable)
---import Copilot.Compile.SBV.Copilot2SBV
+
 --------------------------------------------------------------------------------
 
 compile :: String -> C.Spec -> IO ()
@@ -27,11 +27,15 @@ compile fileName spec = do
     Nothing 
     fileName
     (updateStates meta spec ++ fireTriggers meta spec)
-    
+
+  putStrLn "----------------------------------------------"    
   putStrLn "Creating Driver ..."
+  putStrLn "----------------------------------------------"    
 
-  driver meta spec
+  driver meta fileName
 
+  putStrLn "----------------------------------------------"    
   putStrLn "Done ..."
+  putStrLn "----------------------------------------------"    
 
 --------------------------------------------------------------------------------

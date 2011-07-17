@@ -6,10 +6,13 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Copilot.Compile.SBV.Copilot2SBV
-  -- ( c2sExpr
-  -- , c2sType
-  -- ) 
+  ( c2sExpr
+  ) 
 where
+
+import Prelude hiding (id)
+import Data.Map (Map)
+import qualified Data.Map as M
 
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
@@ -17,12 +20,9 @@ import qualified Data.SBV.Internals as S
 import qualified Copilot.Compile.SBV.Queue as Q (lookahead)
 import Copilot.Compile.SBV.MetaTable
 import qualified Copilot.Compile.SBV.Witness as W
+
 import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
-
-import Data.Map (Map)
-import qualified Data.Map as M
-import Prelude hiding (id)
 
 --------------------------------------------------------------------------------
 
@@ -128,15 +128,15 @@ instance C.Expr C2SExpr where
     res2 <- c2sExpr_ e2 env meta 
     res3 <- c2sExpr_ e3 env meta
     c2sOp3 op res1 res2 res3
-      
-----------------------------------------------------
+
+--------------------------------------------------------------------------------      
 
 noFloatOpsErr :: String -> a
 noFloatOpsErr op = 
   error ("Floating/Double operators not supported for the SBV backend: " 
          ++ "operator " ++ op ++ " not supported.")
 
-----------------------------------------------------
+--------------------------------------------------------------------------------      
 
 eta1 :: (a -> a) -> (a -> S.SBVCodeGen a)
 eta1 f = \a -> return $ f a
@@ -164,7 +164,7 @@ instance C.Op1 C2SOp1 where
   atanh _ = noFloatOpsErr "atanh"
   acosh _ = noFloatOpsErr "acosh"
 
-----------------------------------------------------
+--------------------------------------------------------------------------------
 
 eta2 :: (a -> a -> a) -> (a -> a -> S.SBVCodeGen a)
 eta2 f = \a b -> return $ f a b
@@ -198,5 +198,4 @@ instance C.Op3 C2SOp3 where
     case W.mergeableInst t of 
       W.MergeableInst -> \b c1 c2 -> return $ S.ite b c1 c2
                                   
-
-----------------------------------------------------
+--------------------------------------------------------------------------------      

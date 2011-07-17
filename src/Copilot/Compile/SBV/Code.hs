@@ -8,9 +8,7 @@ module Copilot.Compile.SBV.Code
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV (c2sExpr)
-import Copilot.Compile.SBV.MetaTable
-  (MetaTable (..), StreamInfo (..)) -- XXX , ExternInfo (..))
---import qualified Copilot.Compile.SBV.Queue as Q
+import Copilot.Compile.SBV.MetaTable (MetaTable (..), StreamInfo (..)) 
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
@@ -29,36 +27,6 @@ type SBVFunc  = (String, S.SBVCodeGen ())
 
 mkSBVFunc :: String -> S.SBVCodeGen () -> (String, S.SBVCodeGen ())
 mkSBVFunc str codeGen = (str, codeGen)
-
---type SBVFuncs = [SBVFunc]
-
---------------------------------------------------------------------------------
-
--- schedule :: MetaTable -> C.Spec -> SBVFuncs
--- schedule meta spec =
-
--- We just take the current values of externals, so no explicit sampling
---    required.  
---  sampleExterns meta >>
---    updateStates    meta spec 
---    fireTriggers    meta spec 
---    updatePointers  meta spec
-
---------------------------------------------------------------------------------
-
--- sampleExterns :: MetaTable -> S.SBVCodeGen ()
--- sampleExterns = 
-  -- mapM_ sampleExtern . M.toList . externInfoMap
-
-  -- where
-
-  -- sampleExtern :: (C.Name, ExternInfo) -> Atom ()
-  -- sampleExtern (name, ExternInfo v t) =
-  --   exactPhase (fromEnum SampleExterns) $
-  --     atom ("sample_" ++ name) $
-  --       do
-  --         W.AssignInst <- return $ W.assignInst t
-  --         v <== A.value (A.var' name (c2aType t))
 
 --------------------------------------------------------------------------------
 
@@ -96,7 +64,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
                      , C.triggerGuard = guard
                      , C.triggerArgs  = args } =
       mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
-    : map (mkTriggerArg name) (zip [0,1 ..] args)
+    : map (mkTriggerArg name) (mkTriggerArgIdx args)
     where 
     mkSBVExp = do 
       e <- c2sExpr meta guard
@@ -114,67 +82,4 @@ fireTriggers meta (C.Spec _ _ triggers) =
       Just p <- return (t =~= t) 
       S.cgReturn $ coerce (cong p) e'
         
-  -- mkSBVExp :: C.Expr e => e Bool -> S.SBVCodeGen ()
-  -- mkSBVExp e = do 
-  --   e' <- c2sExpr meta e
-  --   S.cgReturn e' -- $ coerce (cong (C.Bool True)) e'
-
---mkSBVFunc ("trigger_guard_" ++ name) 
-  
-
--- fireTriggers :: MetaTable -> C.Spec -> SBVFuncs
--- fireTriggers meta (C.Spec _ _ triggers) =
---   map fireTrigger triggers
-
---   where
-
--- -- XXX there's no way to call an external function from within SBV-generated
--- -- code.  So the best we can do is ask if the guard is true, and if so, call a C
--- -- function ourselves with the arguments.  For now, let's just return the boolean.
---   fireTrigger :: C.Trigger -> SBVFunc
---   fireTrigger (C.Trigger name guardExp _) = 
---     mkSBVFunc ("trigger_" ++ name ++ "_guard") $ 
--- --    exactPhase (fromEnum FireTriggers) $
--- --      atom ("fire_trigger_" ++ name) $
--- --    args' <- mapM triggerArg2SBV (reverse args)
---     do 
---       exp'  <- c2sExpr meta guardExp
---       S.cgReturn exp'
---     -- cond exp'
-    -- A.action fnCall args'
-
---    where
-
-    -- triggerArg2SBV :: C.TriggerArg -> S.SBVCodeGen (S.SBV a)
-    -- triggerArg2SBV (C.TriggerArg e t) = c2sExpr meta e
---      case W.symWordInst t of W.SymWordInst -> 
-        
-
-        -- case W.exprInst t of
-        --   W.ExprInst -> A.ue (
-
-    -- fnCall :: [String] -> String
-    -- fnCall xs = name ++ "(" ++ concat (intersperse "," xs) ++ ")"
-
---------------------------------------------------------------------------------
-
--- updatePointers :: MetaTable -> C.Spec -> SBVFuncs
--- updatePointers meta C.Spec { C.specStreams = streams } =
---   map updateBuffer streams
-
---   where
-
-  -- updateBuffer :: C.Stream -> SBVFunc
-  -- updateBuffer C.Stream { C.streamId = id } =
-  --   let Just strmInfo = M.lookup id (streamInfoMap meta) in
-  --   mkSBVFunc ("update_pointer_" ++ show id) (updatePointer1 strmInfo)
-
-  -- updatePointer1 :: StreamInfo -> S.SBVCodeGen ()
-  -- updatePointer1 (StreamInfo queue tmpVar t) = do
-  --   -- W.SymWordInst <- return (W.symWordInst t)
-  --   -- W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-  --  input <- S.cgInput tmpVar
-
-  --  Q.dropFirstElemAndSnoc queue
-
 --------------------------------------------------------------------------------

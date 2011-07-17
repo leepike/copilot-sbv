@@ -6,9 +6,11 @@
 
 module Copilot.Compile.SBV.MetaTable
   ( StreamInfo (..)
-  , ExternInfo (..)
   , StreamInfoMap
+  , ExternInfo (..)
   , ExternInfoMap
+  , TriggerInfo (..)
+  , TriggerInfoMap
   , MetaTable (..)
   , allocMetaTable
   ) where
@@ -34,7 +36,6 @@ import Prelude hiding (id)
 data StreamInfo = forall a . StreamInfo
   { streamInfoQueue   :: Q.Queue a
   , streamFnInputs    :: [String]
---  , streamId          :: C.Id
   , streamInfoType    :: C.Type a }
 
 type StreamInfoMap = Map C.Id StreamInfo
@@ -42,25 +43,34 @@ type StreamInfoMap = Map C.Id StreamInfo
 --------------------------------------------------------------------------------
 
 data ExternInfo = forall a . ExternInfo
-  { --externInfoVar     :: Var a
-    externInfoSBV     :: S.SBVCodeGen (S.SBV a)
+  { externInfoSBV     :: S.SBVCodeGen (S.SBV a)
   , externInfoType    :: C.Type a }
 
 type ExternInfoMap = Map C.Name ExternInfo
 
 --------------------------------------------------------------------------------
 
+data TriggerInfo = TriggerInfo
+  { guardArgs      :: [String]
+  , triggerArgArgs :: [[String]] }
+
+type TriggerInfoMap = Map C.Name TriggerInfo
+
+--------------------------------------------------------------------------------
+
 data MetaTable = MetaTable
   { streamInfoMap     :: StreamInfoMap
-  , externInfoMap     :: ExternInfoMap }
+  , externInfoMap     :: ExternInfoMap 
+  , triggerInfoMap    :: TriggerInfoMap }
 
 --------------------------------------------------------------------------------
 
 allocMetaTable :: C.Spec -> MetaTable
 allocMetaTable spec =
-  let streamInfoMap_ = M.fromList $ map allocStream (C.specStreams spec) in
-  let externInfoMap_ = M.fromList $ map allocExtern (C.externals spec) in
-  MetaTable streamInfoMap_ externInfoMap_
+  let streamInfoMap_  = M.fromList $ map allocStream (C.specStreams spec) in
+  let externInfoMap_  = M.fromList $ map allocExtern (C.externals spec) in
+  let triggerInfoMap_ = M.fromList $ map allocTrigger (C.specTriggers spec) in
+  MetaTable streamInfoMap_ externInfoMap_ triggerInfoMap_
 
 --------------------------------------------------------------------------------
 
@@ -72,13 +82,11 @@ allocStream C.Stream
               , C.streamExprType = t
               } =
   let que = Q.queue t id buf in
---    let tmp = mkTmpStVar (show id)  in
   let
     strmInfo =
       StreamInfo
         { streamInfoQueue       = que
         , streamFnInputs        = nub (c2Args e)
---          , streamId              = id
         , streamInfoType        = t } in
   (id, strmInfo)
 
@@ -86,7 +94,6 @@ allocStream C.Stream
 
 allocExtern :: C.Extern -> (C.Name, ExternInfo)
 allocExtern (C.Extern name t) =
---  let v     = var name (C.uninitialized t) in
   let cgVar = do W.SymWordInst <- return (W.symWordInst t)
                  W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
                  Just p <- return (t =~= t)
@@ -96,9 +103,19 @@ allocExtern (C.Extern name t) =
 
 --------------------------------------------------------------------------------
 
--- Getting SBV function args from the expressions.
+allocTrigger :: C.Trigger -> (C.Name, TriggerInfo)
+allocTrigger C.Trigger { C.triggerName  = name
+                       , C.triggerGuard = guard
+                       , C.triggerArgs  = args } = 
+  let mkArgArgs :: C.TriggerArg -> [String]
+      mkArgArgs C.TriggerArg { C.triggerArgExpr = e } = nub (c2Args e) in
+  let triggerInfo = 
+        TriggerInfo { guardArgs      = nub (c2Args guard)
+                    , triggerArgArgs = map mkArgArgs args } in
+  (name, triggerInfo)
 
 --------------------------------------------------------------------------------
+-- Getting SBV function args from the expressions.
 
 newtype C2Args a = C2Args
   { c2Args :: [String] }

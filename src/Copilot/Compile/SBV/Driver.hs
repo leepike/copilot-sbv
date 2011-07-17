@@ -11,37 +11,58 @@ module Copilot.Compile.SBV.Driver
   ( driver 
   ) where
 
---import Control.Monad.State
-
+import Prelude hiding (id)
 import qualified Data.Map as M
 import Text.PrettyPrint.HughesPJ
---import Copilot.Compile.SBV.Queue
---import Copilot.Compile.SBV.Common
+
 import Copilot.Compile.SBV.MetaTable
 import Copilot.Compile.SBV.Common
---import Copilot.Compile.SBV.Copilot2SBV
-
---import qualified Data.SBV as S
---import qualified Data.SBV.Internals as S
 
 import qualified Copilot.Core as C
-import Prelude hiding (id)
 
 --------------------------------------------------------------------------------
 
-driver :: MetaTable -> C.Spec ->  IO ()
-driver meta spec =
-  putStrLn $ renderStyle (style {lineLength = 80}) code
+-- | Define a C function.
+mkFunc :: String -> Doc -> Doc
+mkFunc fnName doc =
+  text fnName <> lparen <> text "void" <> rparen <+> lbrace 
+    $$ nest 2 doc $$ nest 0 rbrace
+
+mkArgs :: [Doc] -> Doc
+mkArgs args = hsep (punctuate comma args)
+
+mkFuncCall :: String -> [Doc] -> Doc
+mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen 
+
+--------------------------------------------------------------------------------
+
+driver :: MetaTable -> String -> IO ()
+driver meta fileName = do
+  putStrLn (mkStyle copilot)
+  putStrLn ""
+  putStrLn (mkStyle driverFn) 
+
   where 
-  code = 
+  mkStyle :: Doc -> String
+  mkStyle = renderStyle (style {lineLength = 80})
+
+  driverFn :: Doc 
+  driverFn = 
+    mkFunc ("driver_" ++ fileName) 
+           (   mkFuncCall sampleExtsF    [] <> semi
+            $$ mkFuncCall updateStatesF  [] <> semi
+            $$ mkFuncCall triggersF      [] <> semi
+            $$ mkFuncCall updateBuffersF [] <> semi
+            $$ mkFuncCall updatePtrsF    [] <> semi) 
+
+  copilot = 
        preCode meta 
     $$ declareVars meta 
     $$ sampleExts meta 
-    $$ updateStates meta spec
-    $$ fireTriggers undefined meta 
+    $$ updateStates meta
+    $$ fireTriggers meta
     $$ updateBuffers meta  
     $$ updatePtrs meta 
-    $$ mkMain  
 
 --------------------------------------------------------------------------------
 
@@ -62,52 +83,39 @@ sampleExts MetaTable { externInfoMap = extMap } =
   mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap) 
 
   where
-  -- extVar = var;
   sampleExt :: C.Name -> Doc
   sampleExt name = text (mkExtTmpVar name) <+> equals <+> text name <> semi
 
 --------------------------------------------------------------------------------
 
-updateStates :: MetaTable -> C.Spec -> Doc
-updateStates MetaTable { streamInfoMap = strMap } spec = 
+updateStates :: MetaTable -> Doc
+updateStates MetaTable { streamInfoMap = strMap } = 
   mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
 
   where 
   -- tmp_X = updateState(arg0, arg1, ... );
   updateSt :: (C.Id, StreamInfo) -> Doc
   updateSt (id, StreamInfo { streamFnInputs = args }) =
-    text (mkTmpStVar id) <+> equals <+> text (mkUpdateStFn id) <>
-      lparen <> mkArgs (map text args) <> 
-      rparen <> semi
-
-  mkArgs :: [Doc] -> Doc
-  mkArgs args = hsep (punctuate comma args)
+    text (mkTmpStVar id) <+> equals 
+      <+> mkFuncCall (mkUpdateStFn id) (map text args) <> semi
 
 --------------------------------------------------------------------------------
 
-fireTriggers :: [C.Trigger] -> MetaTable -> Doc
-fireTriggers triggers meta = 
-  mkFunc triggersF $ vcat $ map fireTrig triggers
+fireTriggers :: MetaTable -> Doc
+fireTriggers MetaTable { triggerInfoMap = triggers } =
+
+  mkFunc triggersF $ vcat $ map fireTrig (M.toList triggers)
 
   where
   -- if (guard) trigger(args);
-  fireTrig :: C.Trigger -> Doc
-  fireTrig C.Trigger { C.triggerName  = name
-                     , C.triggerGuard = guard
-                     , C.triggerArgs  = args } =
-    text "if" <+> lparen <> mkGuard name <> rparen <+> 
-      text name <> lparen <> sep (map mkArg args) <> rparen <> semi
-
-  -- guard(arg0, arg1, ...)
-  mkGuard :: String -> Doc
-  mkGuard name = text (mkTriggerGuardFn name) <> lparen <> undefined <> rparen
-
-  mkArg :: C.TriggerArg -> Doc
-  mkArg C.TriggerArg { C.triggerArgExpr = e
-                     , C.triggerArgType = t } = undefined
- 
-  sep :: [Doc] -> Doc
-  sep  args = hsep (punctuate comma args)
+  fireTrig :: (C.Name, TriggerInfo) -> Doc
+  fireTrig (name, TriggerInfo { guardArgs      = gArgs
+                              , triggerArgArgs = argArgs }) = 
+    text "if" <+> lparen <> mkFuncCall name (map text gArgs) <> rparen <+> 
+      mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
+    where
+    mkArg :: (Int, [String]) -> Doc
+    mkArg (i, args) = mkFuncCall (mkTriggerArgFn i name) (map text args)
 
 --------------------------------------------------------------------------------
 
@@ -117,7 +125,6 @@ updateBuffers MetaTable { streamInfoMap = strMap } =
 
   where
   updateBuf :: (C.Id, StreamInfo) -> Doc
---  updateBuf (id, StreamInfo { streamInfoQueue = que }) =
   updateBuf (id, _) =
     updateFunc (mkQueueVar id) (mkQueuePtrVar id) (mkTmpStVar id)
 
@@ -134,31 +141,13 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
   where 
   varAndUpdate :: (C.Id, StreamInfo) -> Doc
---  varAndUpdate (id, StreamInfo { streamInfoQueue = queue }) =
   varAndUpdate (id, _) =
     updateFunc (mkQueuePtrVar id)
-
-  -- getSize :: Queue a -> Int
-  -- getSize Queue { size = sz } = sz
 
   -- idx += 1;
   updateFunc :: String -> Doc
   updateFunc ptr =
-    text ptr <+> equals <> text "+" <+> int 1 <> semi
-
---------------------------------------------------------------------------------
-
--- | The main.
-mkMain :: Doc
-mkMain = mkFunc "main" $ vcat $ undefined
-
---------------------------------------------------------------------------------
-
--- | Define a C function.
-mkFunc :: String -> Doc -> Doc
-mkFunc fnName doc =
-  text fnName <> lparen <> text "void" <> rparen <+> lbrace 
-    $$ nest 2 doc $$ nest 0 rbrace
+    text ptr <+> text "+" <> equals <+> int 1 <> semi
 
 --------------------------------------------------------------------------------
 
