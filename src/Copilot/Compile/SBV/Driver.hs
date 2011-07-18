@@ -18,7 +18,7 @@ import qualified System.IO as I
 import Text.PrettyPrint.HughesPJ
 
 import Copilot.Compile.SBV.MetaTable
-import Copilot.Compile.SBV.Queue (Queue(..))
+import Copilot.Compile.SBV.Queue (Queue(..), QueueSize)
 import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
@@ -125,7 +125,7 @@ varDecls meta = vcat $ map varDecl (getVars meta)
       where 
       vals = hcat $ punctuate (comma <> text " ") 
                               (map (text . cShow . C.showWithType t) inits)
-    getSz Queue { size = sz } = int sz
+    getSz Queue { size = sz } = int $ fromIntegral sz
 
   getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
   getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
@@ -215,11 +215,11 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
     updateFunc (size que) (mkQueuePtrVar id)
 
   -- idx = (idx + 1) % queueSize;
-  updateFunc :: Int -> String -> Doc
+  updateFunc :: QueueSize -> String -> Doc
   updateFunc sz ptr =
     text ptr <+> equals 
-      <+> lparen <+> text ptr <+> text "+" <+> int 1 <> rparen 
-      <+> text "%" <+> int sz <> semi
+      <+> lparen <> text ptr <+> text "+" <+> int 1 <> rparen 
+      <+> text "%" <+> int (fromIntegral sz) <> semi
 
 --------------------------------------------------------------------------------
 

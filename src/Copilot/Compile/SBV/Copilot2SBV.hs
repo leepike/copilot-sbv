@@ -72,8 +72,8 @@ instance C.Expr C2SExpr where
       let Just p = t2 =~= t1
       in  do W.SymWordInst <- return $ W.symWordInst t2
              W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
-             idx <- Q.lookahead i que
-             return $ coerce (cong p) idx
+             val <- Q.lookahead i que
+             return $ coerce (cong p) val
 
   ----------------------------------------------------
 

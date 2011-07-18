@@ -24,13 +24,13 @@ import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 --------------------------------------------------------------------------------
 
-type QueueSize = S.SWord8
+type QueueSize = DropIdx
 
 data Queue a = Queue
   { queueInits      :: [a]
   , queueRingBuffer :: S.SBVCodeGen [S.SBV a] -- Pointer to the queue
-  , queuePointer    :: S.SBVCodeGen QueueSize -- Index into the queue
-  , size            :: Int       -- Size of the queue
+  , queuePointer    :: S.SBVCodeGen (S.SBV QueueSize) -- Index into the queue
+  , size            :: QueueSize       -- Size of the queue
   }
 
 --------------------------------------------------------------------------------
@@ -41,7 +41,8 @@ lookahead i Queue { queueRingBuffer = sbvBuf
                   , queuePointer    =  ptr
                   , size            =  sz }   = do
   p <- ptr
-  let k = (p + fromIntegral i) `S.pMod` fromIntegral sz 
+--  let k = (p + fromIntegral i) `S.pMod` fromIntegral sz 
+  let k = p + fromIntegral (i `mod` sz) `S.pMod` fromIntegral sz
   buf <- sbvBuf
   let defaultVal = if null buf then error "lookahead error" else head buf
   return $ S.select buf defaultVal k
@@ -60,6 +61,6 @@ queue t id xs =
   in Queue { queueInits      = xs 
            , queueRingBuffer = buf
            , queuePointer    = p
-           , size            = sz } 
+           , size            = fromIntegral sz } 
 
 --------------------------------------------------------------------------------
