@@ -1,9 +1,8 @@
-module TestSBV where
-
+module Test where
 
 import qualified Prelude as P
 
-import Copilot.Language.Prelude --hiding (even, odd)
+import Copilot.Language.Prelude
 import Copilot.Language
 import Copilot.Compile.SBV
 import Copilot.Language.Reify (reify)
@@ -26,6 +25,6 @@ spec = do
 --  trigger "trig2" true [arg (4::Stream Word64)]
 
 main = do 
-  reify spec >>= compile "sbv" 
+  reify spec >>= compile "test" 
 
 

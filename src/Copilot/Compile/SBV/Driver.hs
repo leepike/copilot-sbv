@@ -22,6 +22,7 @@ import Copilot.Compile.SBV.Queue (Queue(..))
 import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
+import qualified Copilot.Core.Type.Show as C (showWithType)
 
 --------------------------------------------------------------------------------
 
@@ -88,13 +89,16 @@ driver meta dir fileName = do
 
 --------------------------------------------------------------------------------
 
+-- Declare gloabl variables.
+
 data Decl = Decl { retT    :: Doc
-                 , declVar :: Doc }
+                 , declVar :: Doc
+                 , initVal :: Doc }
 
 varDecls :: MetaTable -> Doc
 varDecls meta = vcat $ map varDecl (getVars meta)
-  where
 
+  where
   getVars :: MetaTable -> [Decl] 
   getVars MetaTable { streamInfoMap = streams 
                     , externInfoMap = externs } = 
@@ -104,24 +108,41 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     ++ map getExtVars (M.toList externs)
 
   getTmpStVars :: (C.Id, StreamInfo) -> Decl
-  getTmpStVars (id, StreamInfo { streamInfoType = t }) = 
-    Decl (retType t) (text $ mkTmpStVar id)
+  getTmpStVars (id, StreamInfo { streamInfoType  = t
+                               , streamInfoQueue = que }) = 
+    Decl (retType t) (text $ mkTmpStVar id) (getFirst que)
+    where 
+    getFirst Queue { queueInits = xs } = text (cShow $ C.showWithType t (head xs))
   
   getQueueVars :: (C.Id, StreamInfo) -> Decl
-  getQueueVars (id, StreamInfo { streamInfoType = t }) = 
-    Decl (retType t) (text $ "*" ++ mkQueueVar id)
+  getQueueVars (id, StreamInfo { streamInfoType = t
+                               , streamInfoQueue = que }) =
+    Decl (retType t) 
+         (text (mkQueueVar id) <> lbrack <> getSz que <> rbrack) 
+         (getInits que)
+    where 
+    getInits Queue { queueInits = inits } = lbrace <+> vals <+> rbrace
+      where 
+      vals = hcat $ punctuate (comma <> text " ") 
+                              (map (text . cShow . C.showWithType t) inits)
+    getSz Queue { size = sz } = int sz
 
   getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
   getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
-    Decl (retType t) (text $ mkQueuePtrVar id)
+    Decl (retType t) (text $ mkQueuePtrVar id) (int 0)
 
   getExtVars :: (C.Name, ExternInfo) -> Decl
   getExtVars (var, ExternInfo { externInfoType = t }) = 
-    Decl (retType t) (text $ mkExtTmpVar var)
+    Decl (retType t) (text $ mkExtTmpVar var) (int 0)
 
   varDecl :: Decl -> Doc
-  varDecl Decl { retT = t, declVar = v } =
-    t <+> v <> semi
+  varDecl Decl { retT = t, declVar = v, initVal = i } =
+    t <+> v <+> equals <+> i <> semi
+
+  cShow :: String -> String
+  cShow "True"  = show (1::Int)
+  cShow "False" = show (0::Int)
+  cShow x       = x
 
 --------------------------------------------------------------------------------
 

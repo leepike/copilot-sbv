@@ -27,7 +27,8 @@ import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 type QueueSize = S.SWord8
 
 data Queue a = Queue
-  { queueRingBuffer :: S.SBVCodeGen [S.SBV a] -- Pointer to the queue
+  { queueInits      :: [a]
+  , queueRingBuffer :: S.SBVCodeGen [S.SBV a] -- Pointer to the queue
   , queuePointer    :: S.SBVCodeGen QueueSize -- Index into the queue
   , size            :: Int       -- Size of the queue
   }
@@ -36,7 +37,9 @@ data Queue a = Queue
 
 lookahead :: (S.HasSignAndSize a, S.SymWord a) 
           => DropIdx -> Queue a -> S.SBVCodeGen (S.SBV a)
-lookahead i (Queue sbvBuf ptr sz) = do
+lookahead i Queue { queueRingBuffer = sbvBuf
+                  , queuePointer    =  ptr
+                  , size            =  sz }   = do
   p <- ptr
   let k = (p + fromIntegral i) `S.pMod` fromIntegral sz 
   buf <- sbvBuf
@@ -54,7 +57,8 @@ queue t id xs =
                arr <- S.cgInputArr sz (mkQueueVar id)
                Just p_ <- return (t =~= t)
                return $ map (coerce (cong p_)) arr
-  in Queue { queueRingBuffer = buf
+  in Queue { queueInits      = xs 
+           , queueRingBuffer = buf
            , queuePointer    = p
            , size            = sz } 
 
