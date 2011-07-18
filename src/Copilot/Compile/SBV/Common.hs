@@ -3,9 +3,7 @@
 --------------------------------------------------------------------------------
 
 module Copilot.Compile.SBV.Common
-  ( --Var
---  , var
-  mkTmpStVar
+  ( mkTmpStVar
   , mkUpdateStFn
   , mkQueueVar
   , mkQueuePtrVar

@@ -17,25 +17,21 @@ import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 
 --------------------------------------------------------------------------------
 
+-- Note: we put everything in a directory named by the fileName.  
+
 compile :: String -> C.Spec -> IO ()
 compile fileName spec = do 
   let meta = allocMetaTable spec
-
   putStrLn "Compiling SBV-generated functions..."
 
   S.compileToCLib 
-    Nothing 
+    (Just fileName)
     fileName
     (updateStates meta spec ++ fireTriggers meta spec)
 
-  putStrLn "----------------------------------------------"    
-  putStrLn "Creating Driver ..."
-  putStrLn "----------------------------------------------"    
-
-  driver meta fileName
-
-  putStrLn "----------------------------------------------"    
-  putStrLn "Done ..."
-  putStrLn "----------------------------------------------"    
+  putStrLn ""
+  putStrLn $ "Generating: Copilot driver " ++ fileName ++ " .."
+  driver meta fileName fileName
+  putStrLn "Done."
 
 --------------------------------------------------------------------------------

@@ -13,9 +13,12 @@ module Copilot.Compile.SBV.Driver
 
 import Prelude hiding (id)
 import qualified Data.Map as M
+import Data.List (intersperse)
+import qualified System.IO as I
 import Text.PrettyPrint.HughesPJ
 
 import Copilot.Compile.SBV.MetaTable
+import Copilot.Compile.SBV.Queue (Queue(..))
 import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
@@ -25,8 +28,9 @@ import qualified Copilot.Core as C
 -- | Define a C function.
 mkFunc :: String -> Doc -> Doc
 mkFunc fnName doc =
-  text fnName <> lparen <> text "void" <> rparen <+> lbrace 
-    $$ nest 2 doc $$ nest 0 rbrace
+     text "void" <+> text fnName 
+       <> lparen <> text "void" <> rparen <+> lbrace
+  $$ nest 2 doc $$ nest 0 rbrace
 
 mkArgs :: [Doc] -> Doc
 mkArgs args = hsep (punctuate comma args)
@@ -36,11 +40,31 @@ mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
 --------------------------------------------------------------------------------
 
-driver :: MetaTable -> String -> IO ()
-driver meta fileName = do
-  putStrLn (mkStyle copilot)
-  putStrLn ""
-  putStrLn (mkStyle driverFn) 
+driver :: MetaTable -> String -> String -> IO ()
+driver meta dir fileName = do
+  let filePath = dir ++ '/' : ("copilot_driver_" ++ fileName ++ ".c")
+  h <- I.openFile filePath I.WriteMode
+  let wr doc = I.hPutStrLn h (mkStyle doc)
+  
+  wr (    text "/*" 
+      <+> text "Driver for SBV program generated from Copilot." 
+      <+> text "*/")
+  wr (text "/*" <+> text "Edit as you see fit" <+> text "*/")
+  wr (text "")
+  
+  wr (text "#include <inttypes.h>")
+  wr (text "#include <stdbool.h>")
+  wr (text "#include <stdint.h>")
+  wr (text "#include <stdio.h>")
+  wr (text "#include" <+> doubleQuotes (text fileName <> text ".h"))
+  wr (text "")
+
+  wr (varDecls meta)
+  wr (text "")
+
+  wr copilot
+  wr (text "")
+  wr driverFn
 
   where 
   mkStyle :: Doc -> String
@@ -55,26 +79,49 @@ driver meta fileName = do
             $$ mkFuncCall updateBuffersF [] <> semi
             $$ mkFuncCall updatePtrsF    [] <> semi) 
 
-  copilot = 
-       preCode meta 
-    $$ declareVars meta 
-    $$ sampleExts meta 
-    $$ updateStates meta
-    $$ fireTriggers meta
-    $$ updateBuffers meta  
-    $$ updatePtrs meta 
+  copilot = vcat $ intersperse (text "")
+    [ sampleExts meta 
+    , updateStates meta
+    , fireTriggers meta
+    , updateBuffers meta  
+    , updatePtrs meta ]
 
 --------------------------------------------------------------------------------
 
-preCode :: MetaTable -> Doc
-preCode MetaTable { streamInfoMap = strMap
-                  , externInfoMap = extMap } = empty
+data Decl = Decl { retT    :: Doc
+                 , declVar :: Doc }
 
---------------------------------------------------------------------------------
+varDecls :: MetaTable -> Doc
+varDecls meta = vcat $ map varDecl (getVars meta)
+  where
 
-declareVars :: MetaTable -> Doc
-declareVars MetaTable { streamInfoMap = strMap
-                      , externInfoMap = extMap } = empty
+  getVars :: MetaTable -> [Decl] 
+  getVars MetaTable { streamInfoMap = streams 
+                    , externInfoMap = externs } = 
+       map getTmpStVars (M.toList streams)
+    ++ map getQueueVars (M.toList streams)
+    ++ map getQueuePtrVars (M.toList streams)
+    ++ map getExtVars (M.toList externs)
+
+  getTmpStVars :: (C.Id, StreamInfo) -> Decl
+  getTmpStVars (id, StreamInfo { streamInfoType = t }) = 
+    Decl (retType t) (text $ mkTmpStVar id)
+  
+  getQueueVars :: (C.Id, StreamInfo) -> Decl
+  getQueueVars (id, StreamInfo { streamInfoType = t }) = 
+    Decl (retType t) (text $ "*" ++ mkQueueVar id)
+
+  getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
+  getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
+    Decl (retType t) (text $ mkQueuePtrVar id)
+
+  getExtVars :: (C.Name, ExternInfo) -> Decl
+  getExtVars (var, ExternInfo { externInfoType = t }) = 
+    Decl (retType t) (text $ mkExtTmpVar var)
+
+  varDecl :: Decl -> Doc
+  varDecl Decl { retT = t, declVar = v } =
+    t <+> v <> semi
 
 --------------------------------------------------------------------------------
 
@@ -111,9 +158,11 @@ fireTriggers MetaTable { triggerInfoMap = triggers } =
   fireTrig :: (C.Name, TriggerInfo) -> Doc
   fireTrig (name, TriggerInfo { guardArgs      = gArgs
                               , triggerArgArgs = argArgs }) = 
-    text "if" <+> lparen <> mkFuncCall name (map text gArgs) <> rparen <+> 
+    text "if" <+> lparen <> guardF <> rparen <+> 
       mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
     where
+    guardF :: Doc
+    guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
     mkArg :: (Int, [String]) -> Doc
     mkArg (i, args) = mkFuncCall (mkTriggerArgFn i name) (map text args)
 
@@ -141,13 +190,15 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
   where 
   varAndUpdate :: (C.Id, StreamInfo) -> Doc
-  varAndUpdate (id, _) =
-    updateFunc (mkQueuePtrVar id)
+  varAndUpdate (id, StreamInfo { streamInfoQueue = que }) =
+    updateFunc (size que) (mkQueuePtrVar id)
 
-  -- idx += 1;
-  updateFunc :: String -> Doc
-  updateFunc ptr =
-    text ptr <+> text "+" <> equals <+> int 1 <> semi
+  -- idx = (idx + 1) % queueSize;
+  updateFunc :: Int -> String -> Doc
+  updateFunc sz ptr =
+    text ptr <+> equals 
+      <+> lparen <+> text ptr <+> text "+" <+> int 1 <> rparen 
+      <+> text "%" <+> int sz <> semi
 
 --------------------------------------------------------------------------------
 
@@ -157,3 +208,23 @@ updateBuffersF = "updateBuffers"
 updateStatesF  = "updateStates"
 triggersF      = "fireTriggers"
 sampleExtsF    = "sampleExts"
+
+--------------------------------------------------------------------------------
+
+retType :: C.Type a -> Doc
+retType t = text $
+  case t of
+    C.Bool  _ -> "SBool"
+
+    C.Int8  _ -> "SInt8"
+    C.Int16 _ -> "SInt16"
+    C.Int32 _ -> "SInt32"
+    C.Int64 _ -> "SInt64"
+
+    C.Word8  _ -> "SWord8"
+    C.Word16 _ -> "SWord16"
+    C.Word32 _ -> "SWord32"
+    C.Word64 _ -> "SWord64"
+
+    _          -> error "Error in retType: non-SBV type."
+
