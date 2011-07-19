@@ -60,8 +60,8 @@ instance C.Expr C2SExpr where
   ----------------------------------------------------
 
   drop t i id = C2SExpr $ \ _ meta ->
-    let Just strmInfo = M.lookup id (streamInfoMap meta)
-    in  drop1 t strmInfo
+    let Just strmInfo = M.lookup id (streamInfoMap meta) in
+    drop1 t strmInfo
     where
     drop1 :: C.Type a -> StreamInfo -> S.SBVCodeGen (S.SBV a)
     drop1 t1
@@ -69,11 +69,11 @@ instance C.Expr C2SExpr where
         { streamInfoQueue = que
         , streamInfoType  = t2
         } =
-      let Just p = t2 =~= t1
-      in  do W.SymWordInst <- return $ W.symWordInst t2
-             W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
-             val <- Q.lookahead i que
-             return $ coerce (cong p) val
+      let Just p = t2 =~= t1 in
+      do W.SymWordInst <- return $ W.symWordInst t2
+         W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
+         val <- Q.lookahead i que
+         return $ coerce (cong p) val
 
   ----------------------------------------------------
 

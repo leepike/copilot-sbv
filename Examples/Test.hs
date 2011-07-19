@@ -19,10 +19,13 @@ alt2 = [0,1,2] ++ alt2 + 1
 alt3 :: Stream Bool
 alt3 = [True,True,False] ++ alt3
 
+fib :: Stream Word64
+fib = [0, 1] ++ fib + drop 1 fib
+
 spec :: Spec
 spec = do
-  trigger "trig1" (alt3) [arg (3::Stream Word64)]
---  trigger "trig2" true [arg (4::Stream Word64)]
+  trigger "trig1" alt3 [arg (3::Stream Word64)]
+  trigger "trig_fib" (fib < 7) [arg (3::Stream Word64)]
 
 main = do 
   reify spec >>= compile "test" 
