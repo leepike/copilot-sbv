@@ -20,7 +20,10 @@ alt3 :: Stream Bool
 alt3 = [True,True,False] ++ alt3
 
 fib :: Stream Word64
-fib = [0, 1] ++ fib + drop 1 fib
+fib = [0, 1] ++ fib + drop 1 fib'
+
+fib' :: Stream Word64
+fib' = [0, 1] ++ fib + drop 1 fib'
 
 spec :: Spec
 spec = do

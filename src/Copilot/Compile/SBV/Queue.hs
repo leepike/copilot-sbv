@@ -35,17 +35,24 @@ data Queue a = Queue
 
 --------------------------------------------------------------------------------
 
+-- lookahead :: (S.HasSignAndSize a, S.SymWord a) 
+--           => DropIdx -> Queue a -> S.SBVCodeGen (S.SBV a)
+-- lookahead i Queue { queueRingBuffer = sbvBuf
+--                   , queuePointer    =  ptr
+--                   , size            =  sz }   = do
+--   p <- ptr
+--   let k = p + fromIntegral (i `mod` sz) `S.pMod` fromIntegral sz
+--   buf <- sbvBuf
+--   let defaultVal = if null buf then error "lookahead error" else head buf
+--   return $ S.select buf defaultVal k
+
 lookahead :: (S.HasSignAndSize a, S.SymWord a) 
-          => DropIdx -> Queue a -> S.SBVCodeGen (S.SBV a)
-lookahead i Queue { queueRingBuffer = sbvBuf
-                  , queuePointer    =  ptr
-                  , size            =  sz }   = do
-  p <- ptr
---  let k = (p + fromIntegral i) `S.pMod` fromIntegral sz 
-  let k = p + fromIntegral (i `mod` sz) `S.pMod` fromIntegral sz
-  buf <- sbvBuf
-  let defaultVal = if null buf then error "lookahead error" else head buf
-  return $ S.select buf defaultVal k
+          => DropIdx -> [a] -> S.SBV QueueSize -> QueueSize -> S.SBV a
+lookahead i buf ptr sz = 
+  let k = ptr + fromIntegral (i `mod` sz) `S.pMod` fromIntegral sz in
+  let buf_ = map S.literal buf in
+  let defaultVal = if null buf_ then error "lookahead error" else head buf_ in
+  S.select buf_ defaultVal k
 
 --------------------------------------------------------------------------------
 

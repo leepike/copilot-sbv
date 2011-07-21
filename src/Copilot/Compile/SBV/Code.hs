@@ -41,7 +41,7 @@ updateStates meta (C.Spec streams _ _) =
                              , C.streamExprType = t1
                                                       } =
     mkSBVFunc (mkUpdateStFn id) $
-    do e' <- c2sExpr meta e
+    do e' <- c2sExpr id meta e
        let Just strmInfo = M.lookup id (streamInfoMap meta)
        updateStreamState1 t1 e' strmInfo
 
@@ -67,7 +67,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     : map (mkTriggerArg name) (mkTriggerArgIdx args)
     where 
     mkSBVExp = do 
-      e <- c2sExpr meta guard
+      e <- c2sExpr undefined meta guard
       S.cgReturn e 
 
   mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
@@ -76,7 +76,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     mkSBVFunc (mkTriggerArgFn i name) mkExpr
     where  
     mkExpr = do
-      e' <- c2sExpr meta e
+      e' <- c2sExpr undefined meta e
       W.SymWordInst <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       Just p <- return (t =~= t) 
