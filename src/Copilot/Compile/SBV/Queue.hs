@@ -5,9 +5,9 @@
 -- | Implements queues holding stream values.
 
 module Copilot.Compile.SBV.Queue
-  ( Queue(..)
-  , lookahead
-  , queue
+  ( --Queue(..)
+    lookahead
+  -- , queue
   , QueueSize
   ) where
 
@@ -26,12 +26,12 @@ import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 type QueueSize = DropIdx
 
-data Queue a = Queue
-  { queueInits      :: [a]
-  , queueRingBuffer :: S.SBVCodeGen [S.SBV a] -- Pointer to the queue
-  , queuePointer    :: S.SBVCodeGen (S.SBV QueueSize) -- Index into the queue
-  , size            :: QueueSize       -- Size of the queue
-  }
+-- data Queue a = Queue
+--   { queueInits      :: [a]
+-- --  , queueRingBuffer :: S.SBVCodeGen [S.SBV a] -- Pointer to the queue
+-- --  , queuePointer    :: S.SBVCodeGen (S.SBV QueueSize) -- Index into the queue
+-- --  , size            :: QueueSize       -- Size of the queue
+--   }
 
 --------------------------------------------------------------------------------
 
@@ -47,8 +47,9 @@ data Queue a = Queue
 --   return $ S.select buf defaultVal k
 
 lookahead :: (S.HasSignAndSize a, S.SymWord a) 
-          => DropIdx -> [a] -> S.SBV QueueSize -> QueueSize -> S.SBV a
-lookahead i buf ptr sz = 
+          => DropIdx -> [a] -> S.SBV QueueSize -> S.SBV a
+lookahead i buf ptr = 
+  let sz = fromIntegral $ length buf in
   let k = ptr + fromIntegral (i `mod` sz) `S.pMod` fromIntegral sz in
   let buf_ = map S.literal buf in
   let defaultVal = if null buf_ then error "lookahead error" else head buf_ in
@@ -56,18 +57,18 @@ lookahead i buf ptr sz =
 
 --------------------------------------------------------------------------------
 
-queue :: C.Type a -> C.Id -> [a] -> Queue a
-queue t id xs = 
-  let sz  = fromIntegral (length xs) in
-  let p   = S.cgInput (mkQueuePtrVar id) in
-  let buf = do W.SymWordInst        <- return (W.symWordInst t)
-               W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-               arr <- S.cgInputArr sz (mkQueueVar id)
-               Just p_ <- return (t =~= t)
-               return $ map (coerce (cong p_)) arr
-  in Queue { queueInits      = xs 
-           , queueRingBuffer = buf
-           , queuePointer    = p
-           , size            = fromIntegral sz } 
+-- queue :: C.Type a -> C.Id -> [a] -> Queue a
+-- queue t id xs = 
+--   -- let sz  = fromIntegral (length xs) in
+--   -- let p   = S.cgInput (mkQueuePtrVar id) in
+--   -- let buf = do W.SymWordInst        <- return (W.symWordInst t)
+--   --              W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+--   --              arr <- S.cgInputArr sz (mkQueueVar id)
+--   --              Just p_ <- return (t =~= t)
+--   --              return $ map (coerce (cong p_)) arr
+--   Queue { queueInits      = xs }
+-- --           , queueRingBuffer = buf
+-- --           , queuePointer    = p
+-- --           , size            = fromIntegral sz } 
 
 --------------------------------------------------------------------------------

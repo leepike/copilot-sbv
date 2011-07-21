@@ -2,12 +2,14 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
+{-# LANGUAGE Rank2Types #-}
+
 module Copilot.Compile.SBV.Code
   ( updateStates
   , fireTriggers
   ) where
 
-import Copilot.Compile.SBV.Copilot2SBV (c2sExpr)
+import Copilot.Compile.SBV.Copilot2SBV (c2sExpr, Inputs(..))
 import Copilot.Compile.SBV.MetaTable (MetaTable (..), StreamInfo (..)) 
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
@@ -40,10 +42,11 @@ updateStates meta (C.Spec streams _ _) =
                              , C.streamExpr     = e
                              , C.streamExprType = t1
                                                       } =
-    mkSBVFunc (mkUpdateStFn id) $
-    do e' <- c2sExpr id meta e
-       let Just strmInfo = M.lookup id (streamInfoMap meta)
-       updateStreamState1 t1 e' strmInfo
+    mkSBVFunc (mkUpdateStFn id) $ do 
+      inputs <- mkInputs meta e
+      let e' = c2sExpr id meta inputs e 
+      let Just strmInfo = M.lookup id (streamInfoMap meta) 
+      updateStreamState1 t1 e' strmInfo
 
   updateStreamState1 :: C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
   updateStreamState1 t1 e1 (StreamInfo _ _ t2) = do
@@ -66,8 +69,9 @@ fireTriggers meta (C.Spec _ _ triggers) =
       mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
     : map (mkTriggerArg name) (mkTriggerArgIdx args)
     where 
-    mkSBVExp = do 
-      e <- c2sExpr undefined meta guard
+    mkSBVExp = do
+      inputs <- mkInputs meta guard
+      let e = c2sExpr undefined meta inputs guard 
       S.cgReturn e 
 
   mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
@@ -76,10 +80,24 @@ fireTriggers meta (C.Spec _ _ triggers) =
     mkSBVFunc (mkTriggerArgFn i name) mkExpr
     where  
     mkExpr = do
-      e' <- c2sExpr undefined meta e
+      inputs <- mkInputs meta e
+      let e' = c2sExpr undefined meta inputs e 
       W.SymWordInst <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       Just p <- return (t =~= t) 
       S.cgReturn $ coerce (cong p) e'
         
 --------------------------------------------------------------------------------
+
+mkInputs :: MetaTable -> (C.Expr e => e a) -> S.SBVCodeGen Inputs
+mkInputs meta e = return 
+  Inputs { externs         = undefined
+         , queueRingBuffer = undefined
+         , queuePointer    = undefined }
+  -- where 
+  -- buf = do W.SymWordInst        <- return (W.symWordInst t)
+  --          W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+  --          arr <- S.cgInputArr sz (mkQueueVar id)
+  --          Just p_ <- return (t =~= t)
+  --          return $ map (coerce (cong p_)) arr
+

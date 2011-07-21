@@ -34,7 +34,7 @@ import Prelude hiding (id)
 --------------------------------------------------------------------------------
 
 data StreamInfo = forall a . StreamInfo
-  { streamInfoQueue   :: Q.Queue a
+  { streamInfoQueue   :: [a]
   , streamFnInputs    :: [String]
   , streamInfoType    :: C.Type a }
 
@@ -43,8 +43,8 @@ type StreamInfoMap = Map C.Id StreamInfo
 --------------------------------------------------------------------------------
 
 data ExternInfo = forall a . ExternInfo
-  { externInfoSBV     :: S.SBVCodeGen (S.SBV a)
-  , externInfoType    :: C.Type a }
+  { --extern            :: String
+    externInfoType    :: C.Type a }
 
 type ExternInfoMap = Map C.Name ExternInfo
 
@@ -81,11 +81,11 @@ allocStream C.Stream
               , C.streamExpr     = e
               , C.streamExprType = t
               } =
-  let que = Q.queue t id buf in
+--  let que = Q.queue t id buf in
   let
     strmInfo =
       StreamInfo
-        { streamInfoQueue       = que
+        { streamInfoQueue       = buf
         , streamFnInputs        = nub (c2Args e)
         , streamInfoType        = t } in
   (id, strmInfo)
@@ -94,12 +94,12 @@ allocStream C.Stream
 
 allocExtern :: C.Extern -> (C.Name, ExternInfo)
 allocExtern (C.Extern name t) =
-  let cgVar = do W.SymWordInst <- return (W.symWordInst t)
-                 W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-                 Just p <- return (t =~= t)
-                 input <- S.cgInput (mkExtTmpVar name)
-                 return $ coerce (cong p) input in
-  (name, ExternInfo cgVar t)
+  -- let cgVar = do W.SymWordInst <- return (W.symWordInst t)
+  --                W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+  --                Just p <- return (t =~= t)
+  --                input <- S.cgInput (mkExtTmpVar name)
+  --                return $ coerce (cong p) input in
+  (name, ExternInfo t)
 
 --------------------------------------------------------------------------------
 

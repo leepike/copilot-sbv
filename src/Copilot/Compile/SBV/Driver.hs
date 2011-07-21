@@ -18,7 +18,7 @@ import qualified System.IO as I
 import Text.PrettyPrint.HughesPJ
 
 import Copilot.Compile.SBV.MetaTable
-import Copilot.Compile.SBV.Queue (Queue(..), QueueSize)
+import Copilot.Compile.SBV.Queue (QueueSize)
 import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
@@ -110,22 +110,25 @@ varDecls meta = vcat $ map varDecl (getVars meta)
   getTmpStVars :: (C.Id, StreamInfo) -> Decl
   getTmpStVars (id, StreamInfo { streamInfoType  = t
                                , streamInfoQueue = que }) = 
-    Decl (retType t) (text $ mkTmpStVar id) (getFirst que)
+    Decl (retType t) (text $ mkTmpStVar id) getFirst
     where 
-    getFirst Queue { queueInits = xs } = text (cShow $ C.showWithType t (head xs))
+    -- ASSUME queue is nonempty!
+    getFirst = text (cShow $ C.showWithType t (headErr que))
+    headErr [] = error "Error in Copilot.Compile.SBV.Driver: queue nonempty"
+    headErr xs = head xs
   
   getQueueVars :: (C.Id, StreamInfo) -> Decl
   getQueueVars (id, StreamInfo { streamInfoType = t
                                , streamInfoQueue = que }) =
     Decl (retType t) 
-         (text (mkQueueVar id) <> lbrack <> getSz que <> rbrack) 
-         (getInits que)
+         (text (mkQueueVar id) <> lbrack <> int (length que) <> rbrack)
+         getInits
     where 
-    getInits Queue { queueInits = inits } = lbrace <+> vals <+> rbrace
+    getInits = lbrace <+> vals <+> rbrace
       where 
       vals = hcat $ punctuate (comma <> text " ") 
-                              (map (text . cShow . C.showWithType t) inits)
-    getSz Queue { size = sz } = int $ fromIntegral sz
+                              (map (text . cShow . C.showWithType t) que)
+--    getSz Queue { size = sz } = int $ fromIntegral sz
 
   getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
   getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
@@ -212,7 +215,7 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
   where 
   varAndUpdate :: (C.Id, StreamInfo) -> Doc
   varAndUpdate (id, StreamInfo { streamInfoQueue = que }) =
-    updateFunc (size que) (mkQueuePtrVar id)
+    updateFunc (fromIntegral $ length que) (mkQueuePtrVar id)
 
   -- idx = (idx + 1) % queueSize;
   updateFunc :: QueueSize -> String -> Doc
