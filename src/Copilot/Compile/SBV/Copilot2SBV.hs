@@ -50,37 +50,7 @@ data QueueIn a = QueueIn
 
 c2sExpr :: [Input] -> (forall e. C.Expr e => e a) -> S.SBV a
 c2sExpr inputs e = 
---  let Just strmInfo = M.lookup id (streamInfoMap meta) in
-  -- let queInputs :: Q.Queue a -> S.SBVCodeGen QueueInputs
-  --     queInputs Q.Queue { Q.queueRingBuffer = buf
-  --                       , Q.queuePointer    = ptr } = do
-  --       bufIn <- buf
-  --       ptrIn <- ptr
-  --       return $ QueueInputs { this              = id
-  --                            , queueRingBufInput = bufIn
-  --                            , queuePointerInput = ptrIn } in 
-  -- let getInputs :: StreamInfo -> S.SBVCodeGen QueueInputs
-  --     getInputs StreamInfo { streamInfoQueue = que } = queInputs que in
-  -- do queIn <- getInputs strmInfo 
-     c2sExpr_ e M.empty inputs
-
---------------------------------------------------------------------------------
-
--- getQueInternals :: C.Id -> MetaTable -> QueueInternals a
--- getQueInternals id meta =
---   let Just strmInfo = M.lookup id (streamInfoMap meta) in
---   let Queue { queueRingBuffer = buf
---             , queuePointer    = ptr } = streamInfoQueue strmInfo in
---   QueueInternals { queueRingBufInput
-
---------------------------------------------------------------------------------
-
--- We don't want to keep putting inputs into the SBVCodeGen monad---SBV doesn't
--- like that---so we pull them out once here.
--- data QueueInputs = forall a. QueueInputs
---   { this              :: C.Id
---   , queueRingBufInput :: [S.SBV a]
---   , queuePointerInput :: S.SBV Q.QueueSize }
+  c2sExpr_ e M.empty inputs
 
 --------------------------------------------------------------------------------
 
@@ -109,15 +79,18 @@ newtype C2SOp3 a b c d = C2SOp3
 instance C.Expr C2SExpr where
   const t x = C2SExpr $ \ _ _ -> 
     case W.symWordInst t of W.SymWordInst -> S.literal x
+
   ----------------------------------------------------
 
   drop t i id = C2SExpr $ \ _ inputs ->
     let que :: ArrInput
-        Just que = head $ 
-          map ( \x -> case x of
+        Just que = foldl 
+          ( \acc x -> case x of
                         ArrIn id' q -> if id' == id then Just q 
-                                         else Nothing
-                        ExtIn _ _ -> Nothing ) inputs 
+                                         else acc
+                        ExtIn _ _ -> acc ) 
+          Nothing
+          inputs 
     in 
     drop1 t que
 
@@ -157,12 +130,13 @@ instance C.Expr C2SExpr where
 
   extern t name = C2SExpr $ \ _ inputs -> 
     let ext :: ExtInput
-        Just ext = head $ 
-          map ( \x -> case x of
-                        ArrIn _ _ -> Nothing
+        Just ext = foldl 
+          ( \acc x -> case x of
+                        ArrIn _ _ -> acc
                         ExtIn nm e -> if nm == name then Just e
-                                        else Nothing ) 
-              inputs 
+                                        else acc ) 
+          Nothing
+          inputs 
     in 
     getSBV t ext
 
@@ -230,12 +204,6 @@ instance C.Op1 C2SOp1 where
   acosh _ = noFloatOpsErr "acosh"
 
 --------------------------------------------------------------------------------
-
--- eta2 :: (a -> a -> a) -> (a -> a -> a)
--- eta2 f = \a b -> return $ f a b
-
--- eta2b :: (a -> a -> S.SBool) -> (a -> a -> S.SBool)
--- eta2b f = \a b -> return $ f a b
 
 instance C.Op2 C2SOp2 where
   and     = C2SOp2 $                                               (S.&&&)

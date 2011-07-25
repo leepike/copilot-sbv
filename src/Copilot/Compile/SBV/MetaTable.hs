@@ -18,15 +18,8 @@ module Copilot.Compile.SBV.MetaTable
   , c2Args
   ) where
 
---import qualified Data.SBV as S
---import qualified Data.SBV.Internals as S
-
 import Copilot.Compile.SBV.Common
---import qualified Copilot.Compile.SBV.Queue as Q
---import qualified Copilot.Compile.SBV.Witness as W
-
 import qualified Copilot.Core as C
---import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 import qualified Copilot.Core.Spec.Externals as C (Extern (..), externals) 
 
 import Data.Map (Map)
@@ -92,11 +85,6 @@ allocStream C.Stream
 
 allocExtern :: C.Extern -> (C.Name, ExternInfo)
 allocExtern (C.Extern name t) =
-  -- let cgVar = do W.SymWordInst <- return (W.symWordInst t)
-  --                W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-  --                Just p <- return (t =~= t)
-  --                input <- S.cgInput (mkExtTmpVar name)
-  --                return $ coerce (cong p) input in
   (name, ExternInfo t)
 
 --------------------------------------------------------------------------------
@@ -116,11 +104,15 @@ allocTrigger C.Trigger { C.triggerName  = name
 --------------------------------------------------------------------------------
 -- Getting SBV function args from the expressions.
 
+c2Args :: C2Args a -> [Arg]
+c2Args e = nub $ c2Args_ e
+
 newtype C2Args a = C2Args
-  { c2Args :: [Arg] }
+  { c2Args_ :: [Arg] }
 
 data Arg = Extern C.Name
          | Queue  C.Id
+  deriving Eq
 
 argToCall :: Arg -> [String]
 argToCall (Extern name) = [mkExtTmpVar name]
@@ -140,16 +132,16 @@ instance C.Expr C2Args where
   drop _ _ id = C2Args [ Queue id ]
  
   local _ _ _ e1 e2 = 
-    C2Args $ c2Args e1 ++ c2Args e2
+    C2Args $ c2Args_ e1 ++ c2Args_ e2
 
   var _ _ = C2Args []
 
   extern _ name = C2Args [Extern name]
 
-  op1 _ e = C2Args (c2Args e)
+  op1 _ e = C2Args (c2Args_ e)
 
   op2 _ e1 e2 = 
-    C2Args $ c2Args e1 ++ c2Args e2
+    C2Args $ c2Args_ e1 ++ c2Args_ e2
 
   op3 _ e1 e2 e3 = 
-    C2Args $ c2Args e1 ++ c2Args e2 ++ c2Args e3
+    C2Args $ c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3

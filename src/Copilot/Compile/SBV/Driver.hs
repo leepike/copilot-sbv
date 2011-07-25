@@ -13,7 +13,6 @@ module Copilot.Compile.SBV.Driver
 
 import Prelude hiding (id)
 import qualified Data.Map as M
-import qualified Data.List as L
 import Data.List (intersperse)
 import qualified System.IO as I
 import Text.PrettyPrint.HughesPJ
@@ -129,7 +128,6 @@ varDecls meta = vcat $ map varDecl (getVars meta)
       where 
       vals = hcat $ punctuate (comma <> text " ") 
                               (map (text . cShow . C.showWithType t) que)
---    getSz Queue { size = sz } = int $ fromIntegral sz
 
   getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
   getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
@@ -160,26 +158,8 @@ sampleExts MetaTable { externInfoMap = extMap } =
 
 --------------------------------------------------------------------------------
 
--- updateStates :: MetaTable -> [C.Stream] -> Doc
--- updateStates MetaTable { streamInfoMap = strMap } streams = 
--- --             C.Stream { C.streamExpr   = e } = 
---   mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
-
---   where 
---   -- tmp_X = updateState(arg0, arg1, ... );
---   updateSt :: (C.Id, StreamInfo) -> Doc
---   updateSt (id, _) =
---     text (mkTmpStVar id) <+> equals 
---       <+> mkFuncCall (mkUpdateStFn id) 
---                      (map text (getArgs id)) 
---       <> semi
-
---   getArgs :: C.Id -> [String]
---   getArgs id = 
-
 updateStates :: [C.Stream] -> Doc
 updateStates streams = 
---             C.Stream { C.streamExpr   = e } = 
   mkFunc updateStatesF $ vcat $ map updateSt streams
 
   where 
@@ -193,7 +173,7 @@ updateStates streams =
       <> semi
     where 
     getArgs :: [String]
-    getArgs = L.nub (concatMap argToCall (c2Args e))
+    getArgs = concatMap argToCall (c2Args e)
 
 --------------------------------------------------------------------------------
 

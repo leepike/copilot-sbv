@@ -13,7 +13,6 @@ module Copilot.Compile.SBV.Code
 import Copilot.Compile.SBV.Copilot2SBV
 import Copilot.Compile.SBV.MetaTable 
 import qualified Copilot.Compile.SBV.Queue as Q
---  (MetaTable(..), StreamInfo(..), c2Args, Arg(..)) 
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
@@ -24,9 +23,10 @@ import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 
 import qualified Data.Map as M
---import qualified Data.Maybe as N
---import qualified Data.List as L
 import Prelude hiding (id)
+
+-- XXX
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ updateStates meta (C.Spec streams _ _) =
                                                       } =
     mkSBVFunc (mkUpdateStFn id) $ do 
       inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e 
+      let e' = trace "updatestates" $ c2sExpr inputs e 
       let Just strmInfo = M.lookup id (streamInfoMap meta) 
       updateStreamState1 t1 e' strmInfo
 
@@ -76,7 +76,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     where 
     mkSBVExp = do
       inputs <- mkInputs meta (c2Args guard)
-      let e = c2sExpr inputs guard 
+      let e = trace "fireTriggers" $ c2sExpr inputs guard 
       S.cgReturn e 
 
   mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
@@ -86,7 +86,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     where  
     mkExpr = do
       inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e 
+      let e' = trace "mkTrigger" $ c2sExpr inputs e 
       W.SymWordInst <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       Just p <- return (t =~= t) 
@@ -125,7 +125,7 @@ mkInputs meta args =
      Just p <- return (t =~= t)
      return $ coerce (cong p) ext
 
-  argToInput (Queue id)    = 
+  argToInput (Queue id) = 
     let strmInfos = streamInfoMap meta in
     let Just strmInfo = M.lookup id strmInfos in
     mkArrInput strmInfo 
@@ -151,76 +151,3 @@ mkInputs meta args =
     mkPtrInput :: S.SBVCodeGen (S.SBV Q.QueueSize)
     mkPtrInput = do 
       S.cgInput (mkQueuePtrVar id)
-
---    return ()
-
-
-    -- getType :: forall a. StreamInfo -> C.Type a
-    -- getType StreamInfo { streamInfoType  = t } = t 
-
-
-  --   arr <- S.cgInputArr sz (mkQueueVar id)
-  -- S.cgInput (mkQueuePtrVar id) in
-
-
-  -- buf <- bufM
-  -- return $
-
-  -- where 
-  -- bufM = do 
-  --   W.SymWordInst        <- return (W.symWordInst t)
-  --   W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-  --   arr <- S.cgInputArr sz (mkQueueVar id)
-  --   Just p_ <- return (t =~= t)
-  --   return $ map (coerce (cong p_)) arr
-
-  -- -- get queue and queueIdxs
-  -- strmInfosM :: [(C.Id, Maybe StreamInfo)]
-  -- strmInfosM = 
-  --   map (\id -> (id, M.lookup id (streamInfoMap meta)))
-  --       (expDrops e) 
-
-  -- strmInfos :: [(C.Id, Maybe StreamInfo)] -> [(C.Id, StreamInfo)]
-  -- strmInfos = L.filter (\(_, m) -> m /= Nothing)
-
-  -- getQueue :: StreamInfo -> [S.SBV a]
-  -- getQueue StreamInfo { streamInfoQueue = que } = 
-  --   map S.literal que
-
-  -- exts = extNames e
-
---------------------------------------------------------------------------------
-
--- newtype DropIds a = DropIds
---   { expDrops :: [C.Id] }
-
--- instance C.Expr DropIds where
---   const _ _ = DropIds [] 
---   drop _ _ id = DropIds [id]
---   local _ _ _ e1 e2 = 
---     DropIds $ expDrops e1 ++ expDrops e2
---   var _ _ = DropIds []
---   extern _ _ = DropIds []
---   op1 _ e = DropIds (expDrops e)
---   op2 _ e1 e2 = 
---     DropIds $ expDrops e1 ++ expDrops e2
---   op3 _ e1 e2 e3 = 
---     DropIds $ expDrops e1 ++ expDrops e2 ++ expDrops e3
-
--- --------------------------------------------------------------------------------
-
--- newtype ExternNames a = ExternNames
---   { extNames :: [String] }
-
--- instance C.Expr ExternNames where
---   const _ _ = ExternNames [] 
---   drop _ _ _ = ExternNames []
---   local _ _ _ e1 e2 = 
---     ExternNames $ extNames e1 ++ extNames e2
---   var _ _ = ExternNames []
---   extern _ name = ExternNames [name]
---   op1 _ e = ExternNames (extNames e)
---   op2 _ e1 e2 = 
---     ExternNames $ extNames e1 ++ extNames e2
---   op3 _ e1 e2 e3 = 
---     ExternNames $ extNames e1 ++ extNames e2 ++ extNames e3
