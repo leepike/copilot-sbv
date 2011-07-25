@@ -2,8 +2,6 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
--- |
-
 module Copilot.Compile.SBV
   ( compile
   ) where
@@ -31,7 +29,7 @@ compile fileName spec = do
 
   putStrLn ""
   putStrLn $ "Generating: Copilot driver " ++ fileName ++ " .."
-  driver meta fileName fileName
+  driver meta spec fileName fileName
   putStrLn "Done."
 
 --------------------------------------------------------------------------------

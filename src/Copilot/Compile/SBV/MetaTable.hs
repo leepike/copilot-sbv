@@ -13,17 +13,20 @@ module Copilot.Compile.SBV.MetaTable
   , TriggerInfoMap
   , MetaTable (..)
   , allocMetaTable
+  , argToCall
+  , Arg(..)
+  , c2Args
   ) where
 
-import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
+--import qualified Data.SBV as S
+--import qualified Data.SBV.Internals as S
 
 import Copilot.Compile.SBV.Common
-import qualified Copilot.Compile.SBV.Queue as Q
-import qualified Copilot.Compile.SBV.Witness as W
+--import qualified Copilot.Compile.SBV.Queue as Q
+--import qualified Copilot.Compile.SBV.Witness as W
 
 import qualified Copilot.Core as C
-import Copilot.Core.Type.Equality ((=~=), coerce, cong)
+--import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 import qualified Copilot.Core.Spec.Externals as C (Extern (..), externals) 
 
 import Data.Map (Map)
@@ -35,7 +38,6 @@ import Prelude hiding (id)
 
 data StreamInfo = forall a . StreamInfo
   { streamInfoQueue   :: [a]
-  , streamFnInputs    :: [String]
   , streamInfoType    :: C.Type a }
 
 type StreamInfoMap = Map C.Id StreamInfo
@@ -43,8 +45,7 @@ type StreamInfoMap = Map C.Id StreamInfo
 --------------------------------------------------------------------------------
 
 data ExternInfo = forall a . ExternInfo
-  { --extern            :: String
-    externInfoType    :: C.Type a }
+  { externInfoType    :: C.Type a }
 
 type ExternInfoMap = Map C.Name ExternInfo
 
@@ -78,15 +79,12 @@ allocStream :: C.Stream -> (C.Id, StreamInfo)
 allocStream C.Stream
               { C.streamId       = id
               , C.streamBuffer   = buf
-              , C.streamExpr     = e
               , C.streamExprType = t
               } =
---  let que = Q.queue t id buf in
   let
     strmInfo =
       StreamInfo
         { streamInfoQueue       = buf
-        , streamFnInputs        = nub (c2Args e)
         , streamInfoType        = t } in
   (id, strmInfo)
 
@@ -108,9 +106,10 @@ allocTrigger C.Trigger { C.triggerName  = name
                        , C.triggerGuard = guard
                        , C.triggerArgs  = args } = 
   let mkArgArgs :: C.TriggerArg -> [String]
-      mkArgArgs C.TriggerArg { C.triggerArgExpr = e } = nub (c2Args e) in
+      mkArgArgs C.TriggerArg { C.triggerArgExpr = e } = 
+        nub (concatMap argToCall (c2Args e)) in
   let triggerInfo = 
-        TriggerInfo { guardArgs      = nub (c2Args guard)
+        TriggerInfo { guardArgs      = nub (concatMap argToCall (c2Args guard))
                     , triggerArgArgs = map mkArgArgs args } in
   (name, triggerInfo)
 
@@ -118,7 +117,15 @@ allocTrigger C.Trigger { C.triggerName  = name
 -- Getting SBV function args from the expressions.
 
 newtype C2Args a = C2Args
-  { c2Args :: [String] }
+  { c2Args :: [Arg] }
+
+data Arg = Extern C.Name
+         | Queue  C.Id
+
+argToCall :: Arg -> [String]
+argToCall (Extern name) = [mkExtTmpVar name]
+argToCall (Queue id ) = [ mkQueuePtrVar id
+                        , mkQueueVar id ]
 
 -- Gathers the names of the arguments to the SBV updateState function so that we
 -- can construct the prototypes.
@@ -130,15 +137,14 @@ newtype C2Args a = C2Args
 instance C.Expr C2Args where
   const _ _ = C2Args [] 
 
-  drop _ _ id = C2Args [ mkQueuePtrVar id
-                       , mkQueueVar id ]
+  drop _ _ id = C2Args [ Queue id ]
  
   local _ _ _ e1 e2 = 
     C2Args $ c2Args e1 ++ c2Args e2
 
   var _ _ = C2Args []
 
-  extern _ name = C2Args [mkExtTmpVar name]
+  extern _ name = C2Args [Extern name]
 
   op1 _ e = C2Args (c2Args e)
 

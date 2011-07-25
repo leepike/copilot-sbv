@@ -7,7 +7,10 @@
 
 module Copilot.Compile.SBV.Copilot2SBV
   ( c2sExpr
-  , Inputs(..)
+  , Input(..)
+  , ExtInput(..)
+  , ArrInput(..)
+  , QueueIn(..)
   ) 
 where
 
@@ -19,7 +22,6 @@ import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 
 import qualified Copilot.Compile.SBV.Queue as Q
-import Copilot.Compile.SBV.MetaTable
 import qualified Copilot.Compile.SBV.Witness as W
 
 import qualified Copilot.Core as C
@@ -28,17 +30,27 @@ import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 --------------------------------------------------------------------------------
 
-data Inputs = forall a. Inputs
-  { externs         :: [ExternInfo]
-  , queueRingBuffer :: [S.SBV a]
-  , queuePointer    :: S.SBV Q.QueueSize }
+data Input = 
+    ExtIn C.Name ExtInput
+  | ArrIn C.Id ArrInput
+
+data ExtInput = forall a. ExtInput 
+  { extInput :: S.SBV a
+  , extType  :: C.Type a }
+
+data ArrInput = forall a. ArrInput 
+  { arrInput :: QueueIn a }
+
+data QueueIn a = QueueIn
+  { queue  :: [S.SBV a]
+  , quePtr :: S.SBV Q.QueueSize 
+  , arrType  :: C.Type a }
 
 --------------------------------------------------------------------------------
 
-c2sExpr :: 
-  C.Id -> MetaTable -> Inputs -> (forall e. C.Expr e => e a) -> S.SBV a
-c2sExpr id meta inputs e = 
-  let Just strmInfo = M.lookup id (streamInfoMap meta) in
+c2sExpr :: [Input] -> (forall e. C.Expr e => e a) -> S.SBV a
+c2sExpr inputs e = 
+--  let Just strmInfo = M.lookup id (streamInfoMap meta) in
   -- let queInputs :: Q.Queue a -> S.SBVCodeGen QueueInputs
   --     queInputs Q.Queue { Q.queueRingBuffer = buf
   --                       , Q.queuePointer    = ptr } = do
@@ -50,7 +62,7 @@ c2sExpr id meta inputs e =
   -- let getInputs :: StreamInfo -> S.SBVCodeGen QueueInputs
   --     getInputs StreamInfo { streamInfoQueue = que } = queInputs que in
   -- do queIn <- getInputs strmInfo 
-     c2sExpr_ e M.empty meta 
+     c2sExpr_ e M.empty inputs
 
 --------------------------------------------------------------------------------
 
@@ -81,7 +93,7 @@ type Env = Map C.Name Local
 --------------------------------------------------------------------------------
 
 newtype C2SExpr a = C2SExpr
-  { c2sExpr_ :: Env -> MetaTable -> S.SBV a }
+  { c2sExpr_ :: Env -> [Input] -> S.SBV a }
 
 newtype C2SOp1 a b = C2SOp1
   { c2sOp1 :: S.SBV a -> S.SBV b }
@@ -99,48 +111,34 @@ instance C.Expr C2SExpr where
     case W.symWordInst t of W.SymWordInst -> S.literal x
   ----------------------------------------------------
 
-  drop t i id = C2SExpr $ \ _ meta ->
-    -- let Just strmInfo = M.lookup id (streamInfoMap meta) in
-    -- drop1 t strmInfo
-    -- where
-    -- drop1 :: C.Type a -> StreamInfo -> S.SBVCodeGen (S.SBV a)
-    -- drop1 t1
-    --   StreamInfo
-    --     { streamInfoQueue = que
-    --     , streamInfoType  = t2
-    --     } =
-    --   if id == this inputs 
-    --     then return $ lookahead i buf ptr sz
-    --     else 
+  drop t i id = C2SExpr $ \ _ inputs ->
+    let que :: ArrInput
+        Just que = head $ 
+          map ( \x -> case x of
+                        ArrIn id' q -> if id' == id then Just q 
+                                         else Nothing
+                        ExtIn _ _ -> Nothing ) inputs 
+    in 
+    drop1 t que
 
-    --   let Just p = t2 =~= t1 in
-    --   do W.SymWordInst <- return $ W.symWordInst t2
-    --      W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
-    --      val <- Q.lookahead i que
-    --      return $ coerce (cong p) val
-
-    let Just strmInfo = M.lookup id (streamInfoMap meta) in
-    drop1 t strmInfo
     where
-    drop1 :: C.Type a -> StreamInfo -> S.SBV a
-    drop1 t1
-      StreamInfo
-        { streamInfoQueue = que
-        , streamInfoType  = t2
-        } =
+    drop1 :: C.Type a -> ArrInput -> S.SBV a
+    drop1 t1 ArrInput { arrInput = QueueIn { queue   = que 
+                                           , quePtr  = qPtr
+                                           , arrType = t2 } } =
       let Just p = t2 =~= t1 in
-      undefined
-      -- W.SymWordInst <- return $ W.symWordInst t2
-      -- W.HasSignAndSizeInst <- return $ W.hasSignAndSizeInst t2
---      Q.lookahead i que undefined
-      -- coerce (cong p) val
+      case W.symWordInst t2 of
+        W.SymWordInst -> 
+          case W.hasSignAndSizeInst t2 of
+            W.HasSignAndSizeInst ->
+              coerce (cong p) (Q.lookahead i que qPtr)
 
   ----------------------------------------------------
 
-  local t1 _ name e1 e2 = C2SExpr $ \ env meta -> 
-    let e1' = c2sExpr_ e1 env meta in
+  local t1 _ name e1 e2 = C2SExpr $ \ env inputs -> 
+    let e1' = c2sExpr_ e1 env inputs in
     let env' = M.insert name (Local e1' t1) env in
-    c2sExpr_ e2 env' meta 
+    c2sExpr_ e2 env' inputs
 
   ----------------------------------------------------
 
@@ -157,37 +155,43 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  extern t name = C2SExpr $ \ _ meta -> 
-    let Just varInfo = M.lookup name (externInfoMap meta) in
-    getSBV t varInfo
+  extern t name = C2SExpr $ \ _ inputs -> 
+    let ext :: ExtInput
+        Just ext = head $ 
+          map ( \x -> case x of
+                        ArrIn _ _ -> Nothing
+                        ExtIn nm e -> if nm == name then Just e
+                                        else Nothing ) 
+              inputs 
+    in 
+    getSBV t ext
+
     where 
-    getSBV :: C.Type a -> ExternInfo -> S.SBV a
-    getSBV t1 ExternInfo { --externInfoSBV = sbvInput
-                           externInfoType = t2 } = 
-      undefined
-      -- Just p <- return (t2 =~= t1)
-      -- v <- sbvInput
-      -- coerce (cong p) v
+    getSBV :: C.Type a -> ExtInput -> S.SBV a
+    getSBV t1 ExtInput { extInput = ext
+                       , extType  = t2 } =
+      let Just p = t2 =~= t1 in
+      coerce (cong p) ext
 
   ----------------------------------------------------
 
-  op1 op e = C2SExpr $ \ env meta -> 
-    let res1 = c2sExpr_ e env meta in
+  op1 op e = C2SExpr $ \ env inputs -> 
+    let res1 = c2sExpr_ e env inputs in
     c2sOp1 op res1
 
   ----------------------------------------------------
 
-  op2 op e1 e2 = C2SExpr $ \ env meta -> 
-    let res1 = c2sExpr_ e1 env meta in
-    let res2 = c2sExpr_ e2 env meta in
+  op2 op e1 e2 = C2SExpr $ \ env inputs -> 
+    let res1 = c2sExpr_ e1 env inputs in
+    let res2 = c2sExpr_ e2 env inputs in
     c2sOp2 op res1 res2 
 
   ----------------------------------------------------
 
-  op3 op e1 e2 e3 = C2SExpr $ \ env meta -> 
-    let res1 = c2sExpr_ e1 env meta in
-    let res2 = c2sExpr_ e2 env meta in
-    let res3 = c2sExpr_ e3 env meta in
+  op3 op e1 e2 e3 = C2SExpr $ \ env inputs -> 
+    let res1 = c2sExpr_ e1 env inputs in
+    let res2 = c2sExpr_ e2 env inputs in
+    let res3 = c2sExpr_ e3 env inputs in
     c2sOp3 op res1 res2 res3
 
 --------------------------------------------------------------------------------      

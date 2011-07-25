@@ -13,6 +13,7 @@ module Copilot.Compile.SBV.Driver
 
 import Prelude hiding (id)
 import qualified Data.Map as M
+import qualified Data.List as L
 import Data.List (intersperse)
 import qualified System.IO as I
 import Text.PrettyPrint.HughesPJ
@@ -41,8 +42,8 @@ mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
 --------------------------------------------------------------------------------
 
-driver :: MetaTable -> String -> String -> IO ()
-driver meta dir fileName = do
+driver :: MetaTable -> C.Spec -> String -> String -> IO ()
+driver meta (C.Spec streams _ _) dir fileName = do
   let filePath = dir ++ '/' : ("copilot_driver_" ++ fileName ++ ".c")
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
@@ -82,7 +83,7 @@ driver meta dir fileName = do
 
   copilot = vcat $ intersperse (text "")
     [ sampleExts meta 
-    , updateStates meta
+    , updateStates streams
     , fireTriggers meta
     , updateBuffers meta  
     , updatePtrs meta ]
@@ -159,16 +160,40 @@ sampleExts MetaTable { externInfoMap = extMap } =
 
 --------------------------------------------------------------------------------
 
-updateStates :: MetaTable -> Doc
-updateStates MetaTable { streamInfoMap = strMap } = 
-  mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
+-- updateStates :: MetaTable -> [C.Stream] -> Doc
+-- updateStates MetaTable { streamInfoMap = strMap } streams = 
+-- --             C.Stream { C.streamExpr   = e } = 
+--   mkFunc updateStatesF $ vcat $ map updateSt (M.toList strMap)
+
+--   where 
+--   -- tmp_X = updateState(arg0, arg1, ... );
+--   updateSt :: (C.Id, StreamInfo) -> Doc
+--   updateSt (id, _) =
+--     text (mkTmpStVar id) <+> equals 
+--       <+> mkFuncCall (mkUpdateStFn id) 
+--                      (map text (getArgs id)) 
+--       <> semi
+
+--   getArgs :: C.Id -> [String]
+--   getArgs id = 
+
+updateStates :: [C.Stream] -> Doc
+updateStates streams = 
+--             C.Stream { C.streamExpr   = e } = 
+  mkFunc updateStatesF $ vcat $ map updateSt streams
 
   where 
   -- tmp_X = updateState(arg0, arg1, ... );
-  updateSt :: (C.Id, StreamInfo) -> Doc
-  updateSt (id, StreamInfo { streamFnInputs = args }) =
+  updateSt :: C.Stream -> Doc
+  updateSt C.Stream { C.streamId   = id 
+                    , C.streamExpr = e } =
     text (mkTmpStVar id) <+> equals 
-      <+> mkFuncCall (mkUpdateStFn id) (map text args) <> semi
+      <+> mkFuncCall (mkUpdateStFn id) 
+                     (map text getArgs) 
+      <> semi
+    where 
+    getArgs :: [String]
+    getArgs = L.nub (concatMap argToCall (c2Args e))
 
 --------------------------------------------------------------------------------
 
