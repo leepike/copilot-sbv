@@ -20,15 +20,15 @@ alt3 :: Stream Bool
 alt3 = [True,True,False] ++ alt3
 
 fib :: Stream Word64
-fib = [0, 1] ++ fib + drop 1 fib'
+fib = [0, 1] ++ fib + drop 1 fib
 
 fib' :: Stream Word64
-fib' = [0, 1] ++ fib + drop 1 fib'
+fib' = [0, 1] ++ fib' + drop 1 fib
 
 spec :: Spec
 spec = do
-  trigger "trig1" alt3 [arg (3::Stream Word64)]
-  trigger "trig_fib" (fib < 7) [arg (3::Stream Word64)]
+  trigger "trig1" true [arg $ fib, arg (3::Stream Word64)]
+  trigger "trig2" (alt3) [arg fib, arg fib]
 
 main = do 
   reify spec >>= compile "test" 
@@ -41,8 +41,12 @@ main = do
     copilot_driver_XXX.c.  Basically, define the triggers and put in a main that
     calls the main driver function.
 
-void trig1(SWord64 x) {
-  printf("trig1: %llu", x);
+void trig1(SWord64 f, SWord64 x) {
+  printf("trig1: f %llu, three %llu\n", f, x);
+}
+
+void trig2(SWord64 f0, SWord64 f1) {
+  printf("trig1: f0 %llu, f1 %llu\n", f0, f1);
 }
 
 int main (void) {
@@ -54,7 +58,7 @@ int main (void) {
   return 0;
 }
 
-(2) Then open the generated Makefile and change driver_sbv.c to copilot_driver_XXX.c
+(2) Then open the generated Makefile and change test_driver.c to copilot_driver_XXX.c
 
 (3) Type make.
 

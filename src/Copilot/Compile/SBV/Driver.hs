@@ -34,7 +34,7 @@ mkFunc fnName doc =
   $$ nest 2 doc $$ nest 0 rbrace
 
 mkArgs :: [Doc] -> Doc
-mkArgs args = hsep (punctuate comma args)
+mkArgs args = hsep (punctuate comma (reverse args))
 
 mkFuncCall :: String -> [Doc] -> Doc
 mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen 

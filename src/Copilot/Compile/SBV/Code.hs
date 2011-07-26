@@ -12,7 +12,6 @@ module Copilot.Compile.SBV.Code
 
 import Copilot.Compile.SBV.Copilot2SBV
 import Copilot.Compile.SBV.MetaTable 
-import qualified Copilot.Compile.SBV.Queue as Q
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
@@ -24,9 +23,6 @@ import qualified Data.SBV.Internals as S
 
 import qualified Data.Map as M
 import Prelude hiding (id)
-
--- XXX
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -49,7 +45,7 @@ updateStates meta (C.Spec streams _ _) =
                                                       } =
     mkSBVFunc (mkUpdateStFn id) $ do 
       inputs <- mkInputs meta (c2Args e)
-      let e' = trace "updatestates" $ c2sExpr inputs e 
+      let e' = c2sExpr inputs e 
       let Just strmInfo = M.lookup id (streamInfoMap meta) 
       updateStreamState1 t1 e' strmInfo
 
@@ -76,7 +72,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     where 
     mkSBVExp = do
       inputs <- mkInputs meta (c2Args guard)
-      let e = trace "fireTriggers" $ c2sExpr inputs guard 
+      let e = c2sExpr inputs guard 
       S.cgReturn e 
 
   mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
@@ -86,7 +82,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
     where  
     mkExpr = do
       inputs <- mkInputs meta (c2Args e)
-      let e' = trace "mkTrigger" $ c2sExpr inputs e 
+      let e' = c2sExpr inputs e 
       W.SymWordInst <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       Just p <- return (t =~= t) 
@@ -135,7 +131,8 @@ mkInputs meta args =
     mkArrInput StreamInfo { streamInfoQueue = que
                           , streamInfoType  = t } = do
       arr <- mkArrInput_ t que
-      ptr <- mkPtrInput 
+      ptr <- S.cgInput (mkQueuePtrVar id)
+
       return $ ArrIn id (ArrInput (QueueIn { queue   = arr
                                            , quePtr  = ptr 
                                            , arrType = t }))
@@ -146,8 +143,4 @@ mkInputs meta args =
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       arr <- S.cgInputArr (length que) (mkQueueVar id)
       Just p <- return (t =~= t)
-      return $ map (coerce $ cong p) arr
-
-    mkPtrInput :: S.SBVCodeGen (S.SBV Q.QueueSize)
-    mkPtrInput = do 
-      S.cgInput (mkQueuePtrVar id)
+      return $ map (coerce $ cong p) arr      
