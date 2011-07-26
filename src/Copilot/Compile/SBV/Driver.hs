@@ -34,7 +34,7 @@ mkFunc fnName doc =
   $$ nest 2 doc $$ nest 0 rbrace
 
 mkArgs :: [Doc] -> Doc
-mkArgs args = hsep (punctuate comma (reverse args))
+mkArgs args = hsep (punctuate comma args) 
 
 mkFuncCall :: String -> [Doc] -> Doc
 mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen 
@@ -169,7 +169,7 @@ updateStates streams =
                     , C.streamExpr = e } =
     text (mkTmpStVar id) <+> equals 
       <+> mkFuncCall (mkUpdateStFn id) 
-                     (map text getArgs) 
+                     (reverse $ map text getArgs) 
       <> semi
     where 
     getArgs :: [String]
@@ -191,9 +191,10 @@ fireTriggers MetaTable { triggerInfoMap = triggers } =
       mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
     where
     guardF :: Doc
-    guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
+    guardF = mkFuncCall (mkTriggerGuardFn name) (reverse $ map text gArgs)
     mkArg :: (Int, [String]) -> Doc
-    mkArg (i, args) = mkFuncCall (mkTriggerArgFn i name) (map text args)
+    mkArg (i, args) = 
+      mkFuncCall (mkTriggerArgFn i name) (reverse $ map text args)
 
 --------------------------------------------------------------------------------
 

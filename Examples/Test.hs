@@ -46,14 +46,14 @@ void trig1(SWord64 f, SWord64 x) {
 }
 
 void trig2(SWord64 f0, SWord64 f1) {
-  printf("trig1: f0 %llu, f1 %llu\n", f0, f1);
+  printf("trig2: f0 %llu, f1 %llu\n", f0, f1);
 }
 
 int main (void) {
   int i=0;
   for(;i<10;i++) {
     driver_test();
-    printf("tmp_0: %i\n", tmp_0);
+//    printf("tmp_0: %i\n", tmp_0);
   }
   return 0;
 }
