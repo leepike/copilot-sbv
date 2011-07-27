@@ -27,11 +27,14 @@ fib' = [0, 1] ++ fib' + drop 1 fib
 
 spec :: Spec
 spec = do
-  trigger "trig1" true [arg $ fib, arg (3::Stream Word64)]
-  trigger "trig2" (alt3) [arg fib, arg fib]
+  trigger "trig1" true [arg fib]
+--  trigger "trig2" true [arg fib, arg alt3]
+
+--  trigger "trig1" true [arg fib, arg (77::Stream Word64)]
+--  trigger "trig1" true [arg nats]
 
 main = do 
-  reify spec >>= compile "test" 
+  reify spec >>= compile "test1" 
 
 {-
 
@@ -58,7 +61,8 @@ int main (void) {
   return 0;
 }
 
-(2) Then open the generated Makefile and change test_driver.c to copilot_driver_XXX.c
+(2) Then open the generated Makefile and change test_driver.c to 
+    copilot_driver_test.c
 
 (3) Type make.
 

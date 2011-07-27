@@ -104,7 +104,7 @@ varDecls meta = vcat $ map varDecl (getVars meta)
                     , externInfoMap = externs } = 
        map getTmpStVars (M.toList streams)
     ++ map getQueueVars (M.toList streams)
-    ++ map getQueuePtrVars (M.toList streams)
+    ++ map getQueuePtrVars (map fst $ M.toList streams)
     ++ map getExtVars (M.toList externs)
 
   getTmpStVars :: (C.Id, StreamInfo) -> Decl
@@ -129,9 +129,12 @@ varDecls meta = vcat $ map varDecl (getVars meta)
       vals = hcat $ punctuate (comma <> text " ") 
                               (map (text . cShow . C.showWithType t) que)
 
-  getQueuePtrVars :: (C.Id, StreamInfo) -> Decl
-  getQueuePtrVars (id, StreamInfo { streamInfoType = t }) = 
-    Decl (retType t) (text $ mkQueuePtrVar id) (int 0)
+  getQueuePtrVars :: C.Id -> Decl
+  getQueuePtrVars id = 
+    Decl (retType queSize) (text $ mkQueuePtrVar id) (int 0)
+    where 
+    queSize :: C.Type QueueSize
+    queSize = C.typeOf 
 
   getExtVars :: (C.Name, ExternInfo) -> Decl
   getExtVars (var, ExternInfo { externInfoType = t }) = 
