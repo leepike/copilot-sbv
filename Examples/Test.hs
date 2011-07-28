@@ -25,9 +25,25 @@ fib = [0, 1] ++ fib + drop 1 fib
 fib' :: Stream Word64
 fib' = [0, 1] ++ fib' + drop 1 fib
 
+logic :: Stream Bool
+logic = [True, False] ++ logic || drop 1 logic
+
+sumExterns :: Stream Word64
+sumExterns =
+  let
+    e1 = extern "e1"
+    e2 = extern "e2"
+  in
+    e1 + e2 + e1
+
+
 spec :: Spec
 spec = do
-  trigger "trig1" true [arg fib]
+  trigger "trig1" alt [ arg $ nats < 3
+                      , arg sumExterns 
+                      , arg logic
+                      ]
+
 --  trigger "trig2" true [arg fib, arg alt3]
 
 --  trigger "trig1" true [arg fib, arg (77::Stream Word64)]

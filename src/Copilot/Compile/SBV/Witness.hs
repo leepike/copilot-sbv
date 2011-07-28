@@ -10,7 +10,7 @@ module Copilot.Compile.SBV.Witness
     SymWordInst(..)       , symWordInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
-  , PolynomialInst(..)    , polyInst
+  , BVDivisibleInst(..)    , divInst
   , OrdInst(..)           , ordInst 
   , MergeableInst(..)     , mergeableInst 
   ) where
@@ -76,22 +76,22 @@ eqInst t =
 
 --------------------------------------------------------------------------------
 
-data PolynomialInst a = S.Polynomial (S.SBV a) => PolynomialInst
+data BVDivisibleInst a = S.BVDivisible (S.SBV a) => BVDivisibleInst
 
-polyInst :: C.Type a -> PolynomialInst a
-polyInst t =
+divInst :: C.Type a -> BVDivisibleInst a
+divInst t =
   case t of
-    C.Bool   _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int8   _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int16  _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int32  _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Int64  _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Word8  p -> mkInst p PolynomialInst
-    C.Word16 p -> mkInst p PolynomialInst
-    C.Word32 p -> mkInst p PolynomialInst
-    C.Word64 p -> mkInst p PolynomialInst
-    C.Float  _ -> error "PolynomialInst!" -- !! supress warning !!
-    C.Double _ -> error "PolynomialInst!" -- !! supress warning !!
+    C.Bool   _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Int8   _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Int16  _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Int32  _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Int64  _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Word8  p -> mkInst p BVDivisibleInst
+    C.Word16 p -> mkInst p BVDivisibleInst
+    C.Word32 p -> mkInst p BVDivisibleInst
+    C.Word64 p -> mkInst p BVDivisibleInst
+    C.Float  _ -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Double _ -> error "BVDivisibleInst!" -- !! supress warning !!
 
 --------------------------------------------------------------------------------
 

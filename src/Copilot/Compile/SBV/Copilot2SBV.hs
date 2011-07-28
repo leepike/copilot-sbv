@@ -181,7 +181,7 @@ noFloatOpsErr op =
 -- eta1 f = \a -> return $ f a
 
 instance C.Op1 C2SOp1 where
-  not     = C2SOp1 $                            S.bnot
+  not     = C2SOp1 $ \x -> S.ite (x S..== S.false) S.true S.false
   abs   t = C2SOp1 $ case W.symWordInst t of 
                        W.SymWordInst         -> abs 
   sign  t = C2SOp1 $ case W.symWordInst t of 
@@ -206,8 +206,12 @@ instance C.Op1 C2SOp1 where
 --------------------------------------------------------------------------------
 
 instance C.Op2 C2SOp2 where
-  and     = C2SOp2 $                                               (S.&&&)
-  or      = C2SOp2 $                                               (S.|||)
+  and     = C2SOp2 $ \x y -> S.ite (x S..== S.false) 
+                                   S.false 
+                                   (S.ite (y S..== S.false) S.false S.true)
+  or      = C2SOp2 $ \x y -> S.ite (x S..== S.false) 
+                                   (S.ite (y S..== S.false) S.false S.true)
+                                   S.true
   add   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (+)
   sub   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (-)
   mul   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (*)
@@ -219,8 +223,10 @@ instance C.Op2 C2SOp2 where
   lt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..<)
   gt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..>)
 
-  div   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst ->  (S.pDiv)
-  mod   t = C2SOp2 $ case W.polyInst     t of W.PolynomialInst ->  (S.pMod)
+  div   t = C2SOp2 $ case W.divInst      t of W.BVDivisibleInst  ->  
+                                                  \x y -> fst (S.bvQuotRem x y)
+  mod   t = C2SOp2 $ case W.divInst      t of W.BVDivisibleInst  ->  
+                                                  \x y -> snd (S.bvQuotRem x y)
 
   fdiv  _ = noFloatOpsErr "fdiv"
   pow   _ = noFloatOpsErr "pow"
