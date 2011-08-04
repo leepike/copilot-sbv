@@ -4,8 +4,9 @@ import qualified Prelude as P
 
 import Copilot.Language.Prelude
 import Copilot.Language
-import Copilot.Compile.SBV
 import Copilot.Language.Reify (reify)
+
+import qualified Copilot.Compile.SBV as S
 
 nats :: Stream Word64
 nats = [0] ++ nats + 1
@@ -50,7 +51,7 @@ spec = do
 --  trigger "trig1" true [arg nats]
 
 main = do 
-  reify spec >>= compile "test1" 
+  reify spec >>= S.compile "test1" 
 
 {-
 
