@@ -93,8 +93,8 @@ allocTrigger :: C.Trigger -> (C.Name, TriggerInfo)
 allocTrigger C.Trigger { C.triggerName  = name
                        , C.triggerGuard = guard
                        , C.triggerArgs  = args } = 
-  let mkArgArgs :: C.TriggerArg -> [String]
-      mkArgArgs C.TriggerArg { C.triggerArgExpr = e } = 
+  let mkArgArgs :: C.UExpr -> [String]
+      mkArgArgs C.UExpr { C.uExprExpr = e } = 
         nub (concatMap argToCall (c2Args e)) in
   let triggerInfo = 
         TriggerInfo { guardArgs      = nub (concatMap argToCall (c2Args guard))

@@ -20,9 +20,9 @@ import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 compile :: String -> C.Spec -> IO ()
 compile fileName spec = do 
   let meta = allocMetaTable spec
-  putStrLn "Compiling SBV-generated functions..."
+  putStrLn "Compiling SBV-generated functions .."
 
-  S.compileToCLib 
+  S.compileToCLib
     (Just fileName)
     fileName
     (updateStates meta spec ++ fireTriggers meta spec)

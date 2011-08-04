@@ -75,9 +75,9 @@ fireTriggers meta (C.Spec _ _ triggers) =
       let e = c2sExpr inputs guard 
       S.cgReturn e 
 
-  mkTriggerArg :: String -> (Int, C.TriggerArg) -> SBVFunc
-  mkTriggerArg name (i, C.TriggerArg { C.triggerArgExpr = e
-                                     , C.triggerArgType = t } ) = 
+  mkTriggerArg :: String -> (Int, C.UExpr) -> SBVFunc
+  mkTriggerArg name (i, C.UExpr { C.uExprExpr = e
+                                , C.uExprType = t } ) = 
     mkSBVFunc (mkTriggerArgFn i name) mkExpr
     where  
     mkExpr = do
