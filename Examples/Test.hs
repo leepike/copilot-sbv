@@ -45,13 +45,16 @@ spec = do
                       , arg logic
                       ]
 
---  trigger "trig2" true [arg fib, arg alt3]
+specC :: IO ()
+specC = reify spec >>= S.compile "test1" 
+  
 
---  trigger "trig1" true [arg fib, arg (77::Stream Word64)]
---  trigger "trig1" true [arg nats]
+fibSpec :: Spec
+fibSpec = do
+  trigger "fib_out" true [arg fib]
 
-main = do 
-  reify spec >>= S.compile "test1" 
+fibC :: IO ()
+fibC = reify fibSpec >>= S.compile "fib" 
 
 {-
 
