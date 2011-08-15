@@ -9,6 +9,7 @@
 
 module Copilot.Compile.SBV.Driver
   ( driver 
+  , driverName
   ) where
 
 import Prelude hiding (id)
@@ -23,6 +24,11 @@ import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
 import qualified Copilot.Core.Type.Show as C (showWithType)
+
+--------------------------------------------------------------------------------
+
+driverName :: String -> String
+driverName fileName = "copilot_driver_" ++ fileName 
 
 --------------------------------------------------------------------------------
 
@@ -43,7 +49,7 @@ mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
 driver :: MetaTable -> C.Spec -> String -> String -> IO ()
 driver meta (C.Spec streams _ _) dir fileName = do
-  let filePath = dir ++ '/' : ("copilot_driver_" ++ fileName ++ ".c")
+  let filePath = dir ++ '/' : driverName fileName ++ ".c"
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
   

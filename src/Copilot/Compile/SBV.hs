@@ -9,7 +9,8 @@ module Copilot.Compile.SBV
 import qualified Copilot.Core as C
 import qualified Data.SBV as S
 
-import Copilot.Compile.SBV.Driver (driver)
+import Copilot.Compile.SBV.Driver (driver, driverName)
+import Copilot.Compile.SBV.Makefile (makefile)
 import Copilot.Compile.SBV.Code (updateStates, fireTriggers)
 import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 
@@ -28,8 +29,14 @@ compile fileName spec = do
     (updateStates meta spec ++ fireTriggers meta spec)
 
   putStrLn ""
-  putStrLn $ "Generating: Copilot driver " ++ fileName ++ " .."
+  putStrLn $ "Generating: Copilot driver " ++ driverName fileName ++ ".c"
   driver meta spec fileName fileName
+
+  putStrLn ""
+  putStrLn $ "Generating: Copilot driver Makefile rules " 
+               ++ fileName ++ ".mk" ++ ".."
+  makefile fileName fileName
+
   putStrLn "Done."
 
 --------------------------------------------------------------------------------
