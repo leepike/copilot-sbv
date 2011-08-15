@@ -10,9 +10,10 @@ module Copilot.Compile.SBV.Witness
     SymWordInst(..)       , symWordInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
-  , BVDivisibleInst(..)    , divInst
+  , BVDivisibleInst(..)   , divInst
   , OrdInst(..)           , ordInst 
   , MergeableInst(..)     , mergeableInst 
+  , BitsInst(..)          , bitsInst 
   ) where
 
 import qualified Data.SBV as S
@@ -20,6 +21,7 @@ import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality
 
+import Data.Bits
 --------------------------------------------------------------------------------
 
 mkInst :: Equal a b -> f b -> f a
@@ -122,5 +124,20 @@ mergeableInst t =
     C.Word32 p -> mkInst p MergeableInst ; C.Word64 p -> mkInst p MergeableInst
     C.Float  _ -> error "MergeableInst!" -- !! supress warning !!
     C.Double _ -> error "MergeableInst!" -- !! supress warning !!
+
+--------------------------------------------------------------------------------
+
+data BitsInst a = (Bits a, S.Bits (S.SBV a)) => BitsInst
+
+bitsInst :: C.Type a -> BitsInst a
+bitsInst t =
+  case t of
+    C.Bool   _ -> error "BitsInst!" -- !! supress warning !!
+    C.Int8   p -> mkInst p BitsInst ; C.Int16  p -> mkInst p BitsInst
+    C.Int32  p -> mkInst p BitsInst ; C.Int64  p -> mkInst p BitsInst
+    C.Word8  p -> mkInst p BitsInst ; C.Word16 p -> mkInst p BitsInst
+    C.Word32 p -> mkInst p BitsInst ; C.Word64 p -> mkInst p BitsInst
+    C.Float  _ -> error "BitsInst!" -- !! supress warning !!
+    C.Double _ -> error "BitsInst!" -- !! supress warning !!
 
 --------------------------------------------------------------------------------

@@ -186,6 +186,9 @@ instance C.Op1 C2SOp1 where
                        W.SymWordInst         -> abs 
   sign  t = C2SOp1 $ case W.symWordInst t of 
                        W.SymWordInst         -> signum
+  bwNot t = C2SOp1 $ case W.bitsInst    t of 
+                       W.BitsInst            -> (S.complement)
+
   recip _ = noFloatOpsErr "recip"
   exp   _ = noFloatOpsErr "exp"
   sqrt  _ = noFloatOpsErr "sqrt"
@@ -227,6 +230,10 @@ instance C.Op2 C2SOp2 where
                                                   \x y -> fst (S.bvQuotRem x y)
   mod   t = C2SOp2 $ case W.divInst      t of W.BVDivisibleInst  ->  
                                                   \x y -> snd (S.bvQuotRem x y)
+
+  bwAnd t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S..&.)
+  bwOr  t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S..|.)
+  bwXor t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S.xor)
 
   fdiv  _ = noFloatOpsErr "fdiv"
   pow   _ = noFloatOpsErr "pow"
