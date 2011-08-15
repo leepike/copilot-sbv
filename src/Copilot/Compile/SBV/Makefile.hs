@@ -16,19 +16,18 @@ makefile dir fileName = do
   let filePath = dir ++ '/' : (fileName ++ ".mk")
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
-  wr $    text "/*" 
-      <+> text "Makefile rules for the Copilot driver."
-      <+> text "*/"
+  wr (text "# Makefile rules for the Copilot driver.")
   wr (text "")
   wr $ text (driverName fileName) <> colon 
         <+> text (driverName fileName) <> text ".c"
         <+> (text fileName <> text ".h")
-  wr $ nest 2 (hsep [ text "$" <> braces (text "CC")
-                    , text "$" <> braces (text "CCFLAGS")
-                    , text "$<"
-                    , text "-o"
-                    , text "$@"
-                    , text fileName <> text ".a"])
+  wr $ text "\t" 
+         <> (hsep [ text "$" <> braces (text "CC")
+                  , text "$" <> braces (text "CCFLAGS")
+                  , text "$<"
+                  , text "-o"
+                  , text "$@"
+                  , text fileName <> text ".a"])
 
   where 
   mkStyle :: Doc -> String

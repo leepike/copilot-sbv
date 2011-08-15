@@ -29,12 +29,12 @@ compile fileName spec = do
     (updateStates meta spec ++ fireTriggers meta spec)
 
   putStrLn ""
-  putStrLn $ "Generating: Copilot driver " ++ driverName fileName ++ ".c"
+  putStrLn $ "Generating: Copilot driver " ++ driverName fileName ++ ".c" ++ " .."
   driver meta spec fileName fileName
 
   putStrLn ""
   putStrLn $ "Generating: Copilot driver Makefile rules " 
-               ++ fileName ++ ".mk" ++ ".."
+               ++ fileName ++ ".mk" ++ " .."
   makefile fileName fileName
 
   putStrLn "Done."
