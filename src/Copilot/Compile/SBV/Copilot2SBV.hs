@@ -128,7 +128,7 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  extern t name = C2SExpr $ \ _ inputs -> 
+  externVar t name = C2SExpr $ \ _ inputs -> 
     let ext :: ExtInput
         Just ext = foldl 
           ( \acc x -> case x of
@@ -137,8 +137,7 @@ instance C.Expr C2SExpr where
                                         else acc ) 
           Nothing
           inputs 
-    in 
-    getSBV t ext
+    in getSBV t ext
 
     where 
     getSBV :: C.Type a -> ExtInput -> S.SBV a
@@ -147,6 +146,22 @@ instance C.Expr C2SExpr where
       let Just p = t2 =~= t1 in
       coerce (cong p) ext
 
+  ----------------------------------------------------
+
+  -- externFun t name _ = C2AExpr $ \ _ meta ->
+  --   let Just extFunInfo = M.lookup name (externFunInfoMap meta) in
+  --   externFun1 t extFunInfo
+
+  --   where
+  --   externFun1 t1
+  --     ExternFunInfo
+  --       { externFunInfoVar  = var
+  --       , externFunInfoType = t2
+  --       } =
+  --     let Just p = t2 =~= t1 in
+  --     case W.exprInst t2 of
+  --       W.ExprInst -> coerce (cong p) (A.value var)
+ 
   ----------------------------------------------------
 
   op1 op e = C2SExpr $ \ env inputs -> 

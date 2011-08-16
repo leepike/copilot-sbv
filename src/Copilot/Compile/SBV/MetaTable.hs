@@ -7,8 +7,10 @@
 module Copilot.Compile.SBV.MetaTable
   ( StreamInfo (..)
   , StreamInfoMap
-  , ExternInfo (..)
+--  , ExternInfo (..)
   , ExternInfoMap
+  , ExternFunInfo (..)
+  , ExternFunInfoMap
   , TriggerInfo (..)
   , TriggerInfoMap
   , MetaTable (..)
@@ -20,7 +22,7 @@ module Copilot.Compile.SBV.MetaTable
 
 import Copilot.Compile.SBV.Common
 import qualified Copilot.Core as C
-import qualified Copilot.Core.Spec.Externals as C (Extern (..), externals) 
+import qualified Copilot.Core.External as C (ExternVar (..), externVars)
 
 import Data.Map (Map)
 import Data.List (nub)
@@ -37,10 +39,18 @@ type StreamInfoMap = Map C.Id StreamInfo
 
 --------------------------------------------------------------------------------
 
-data ExternInfo = forall a . ExternInfo
-  { externInfoType    :: C.Type a }
+-- data ExternInfo = forall a . ExternInfo
+--   { externInfoType    :: C.Type a }
 
-type ExternInfoMap = Map C.Name ExternInfo
+type ExternInfoMap = Map C.Name C.UType
+
+--------------------------------------------------------------------------------
+
+data ExternFunInfo = forall a . ExternFunInfo
+  { externFunInfoArgs :: [(C.UType, C.UExpr)]
+  , externFunInfoType :: C.Type a }
+
+type ExternFunInfoMap = Map C.Name ExternFunInfo
 
 --------------------------------------------------------------------------------
 
@@ -54,7 +64,8 @@ type TriggerInfoMap = Map C.Name TriggerInfo
 
 data MetaTable = MetaTable
   { streamInfoMap     :: StreamInfoMap
-  , externInfoMap     :: ExternInfoMap 
+  , externInfoMap     :: ExternInfoMap
+  , externFunInfoMap  :: ExternFunInfoMap
   , triggerInfoMap    :: TriggerInfoMap }
 
 --------------------------------------------------------------------------------
@@ -62,9 +73,9 @@ data MetaTable = MetaTable
 allocMetaTable :: C.Spec -> MetaTable
 allocMetaTable spec =
   let streamInfoMap_  = M.fromList $ map allocStream (C.specStreams spec) in
-  let externInfoMap_  = M.fromList $ map allocExtern (C.externals spec) in
+  let externInfoMap_  = M.fromList $ map allocExtern (C.externVars spec) in
   let triggerInfoMap_ = M.fromList $ map allocTrigger (C.specTriggers spec) in
-  MetaTable streamInfoMap_ externInfoMap_ triggerInfoMap_
+  MetaTable streamInfoMap_ externInfoMap_ undefined triggerInfoMap_
 
 --------------------------------------------------------------------------------
 
@@ -83,9 +94,9 @@ allocStream C.Stream
 
 --------------------------------------------------------------------------------
 
-allocExtern :: C.Extern -> (C.Name, ExternInfo)
-allocExtern (C.Extern name t) =
-  (name, ExternInfo t)
+allocExtern :: C.ExternVar -> (C.Name, C.UType)
+allocExtern (C.ExternVar name t) =
+  (name, t)
 
 --------------------------------------------------------------------------------
 
@@ -136,7 +147,9 @@ instance C.Expr C2Args where
 
   var _ _ = C2Args []
 
-  extern _ name = C2Args [Extern name]
+  externVar _ name = C2Args [Extern name]
+
+  externFun t name ls = C2Args [Extern name]
 
   op1 _ e = C2Args (c2Args_ e)
 

@@ -142,8 +142,8 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     queSize :: C.Type QueueSize
     queSize = C.typeOf 
 
-  getExtVars :: (C.Name, ExternInfo) -> Decl
-  getExtVars (var, ExternInfo { externInfoType = t }) = 
+  getExtVars :: (C.Name, C.UType) -> Decl
+  getExtVars (var, C.UType { C.uTypeType = t }) = 
     Decl (retType t) (text $ mkExtTmpVar var) (int 0)
 
   varDecl :: Decl -> Doc

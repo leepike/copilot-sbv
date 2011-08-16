@@ -107,8 +107,8 @@ mkInputs meta args =
     mkExtInput extInfo
 
     where 
-    mkExtInput :: ExternInfo -> S.SBVCodeGen Input
-    mkExtInput ExternInfo { externInfoType = t } = do
+    mkExtInput :: C.UType -> S.SBVCodeGen Input
+    mkExtInput C.UType { C.uTypeType = t } = do
       ext <- mkExtInput_ t
       return $ ExtIn name (ExtInput { extInput = ext 
                                     , extType  = t })
