@@ -7,7 +7,6 @@
 module Copilot.Compile.SBV.MetaTable
   ( StreamInfo (..)
   , StreamInfoMap
---  , ExternInfo (..)
   , ExternInfoMap
   , ExternFunInfo (..)
   , ExternFunInfoMap
@@ -38,9 +37,6 @@ data StreamInfo = forall a . StreamInfo
 type StreamInfoMap = Map C.Id StreamInfo
 
 --------------------------------------------------------------------------------
-
--- data ExternInfo = forall a . ExternInfo
---   { externInfoType    :: C.Type a }
 
 type ExternInfoMap = Map C.Name C.UType
 
@@ -121,8 +117,11 @@ c2Args e = nub $ c2Args_ e
 newtype C2Args a = C2Args
   { c2Args_ :: [Arg] }
 
-data Arg = Extern C.Name
-         | Queue  C.Id
+-- Kinds of arguments to SBV functions
+data Arg = Extern    C.Name
+         | ExternFun C.Name
+         | ExternArr C.Name
+         | Queue     C.Id
   deriving Eq
 
 argToCall :: Arg -> [String]
@@ -147,9 +146,14 @@ instance C.Expr C2Args where
 
   var _ _ = C2Args []
 
-  externVar _ name = C2Args [Extern name]
+  externVar   _ name = C2Args [Extern name]
 
-  externFun t name ls = C2Args [Extern name]
+  externFun   _ name args = 
+    C2Args $ ExternFun name : concatMap (\C.UExpr { C.uExprExpr = exp } 
+                                             -> c2Args exp) 
+                                        args
+
+  externArray _ _ name idx = C2Args $ ExternArr name : c2Args_ idx
 
   op1 _ e = C2Args (c2Args_ e)
 
