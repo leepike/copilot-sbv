@@ -24,11 +24,12 @@ import Copilot.Compile.SBV.Common
 
 import qualified Copilot.Core as C
 import qualified Copilot.Core.Type.Show as C (showWithType)
+import Copilot.Compile.Header.C99 (c99HeaderName)
 
 --------------------------------------------------------------------------------
 
 driverName :: String -> String
-driverName fileName = "copilot_driver_" ++ fileName 
+driverName fileName = fileName ++ "_copilot_driver" 
 
 --------------------------------------------------------------------------------
 
@@ -64,6 +65,7 @@ driver meta (C.Spec streams _ _) dir fileName = do
   wr (text "#include <stdint.h>")
   wr (text "#include <stdio.h>")
   wr (text "#include" <+> doubleQuotes (text fileName <> text ".h"))
+  wr (text "#include" <+> doubleQuotes (text $ c99HeaderName fileName))
   wr (text "")
 
   wr (varDecls meta)
@@ -79,7 +81,7 @@ driver meta (C.Spec streams _ _) dir fileName = do
 
   driverFn :: Doc 
   driverFn = 
-    mkFunc ("driver_" ++ fileName) 
+    mkFunc ("step_" ++ fileName) 
            (   mkFuncCall sampleExtsF    [] <> semi
             $$ mkFuncCall updateStatesF  [] <> semi
             $$ mkFuncCall triggersF      [] <> semi

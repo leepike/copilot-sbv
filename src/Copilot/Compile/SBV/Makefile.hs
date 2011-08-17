@@ -3,11 +3,18 @@
 --------------------------------------------------------------------------------
 
 module Copilot.Compile.SBV.Makefile
-  ( makefile ) where
+  ( makefile
+  , makefileName 
+  ) where
 
 import Copilot.Compile.SBV.Driver (driverName)
 import Text.PrettyPrint.HughesPJ
 import qualified System.IO as I
+
+--------------------------------------------------------------------------------
+
+makefileName :: String -> String
+makefileName name = name ++ "_copilot.mk"
 
 --------------------------------------------------------------------------------
 
