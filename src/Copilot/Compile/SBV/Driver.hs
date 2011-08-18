@@ -180,7 +180,7 @@ updateStates streams =
                     , C.streamExpr = e } =
     text (mkTmpStVar id) <+> equals 
       <+> mkFuncCall (mkUpdateStFn id) 
-                     (reverse $ map text getArgs) 
+                     (map text getArgs) 
       <> semi
     where 
     getArgs :: [String]
@@ -202,10 +202,10 @@ fireTriggers MetaTable { triggerInfoMap = triggers } =
       mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
     where
     guardF :: Doc
-    guardF = mkFuncCall (mkTriggerGuardFn name) (reverse $ map text gArgs)
+    guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
     mkArg :: (Int, [String]) -> Doc
     mkArg (i, args) = 
-      mkFuncCall (mkTriggerArgFn i name) (reverse $ map text args)
+      mkFuncCall (mkTriggerArgFn i name) (map text args)
 
 --------------------------------------------------------------------------------
 

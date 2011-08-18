@@ -21,7 +21,7 @@ module Copilot.Compile.SBV.MetaTable
 
 import Copilot.Compile.SBV.Common
 import qualified Copilot.Core as C
-import qualified Copilot.Core.External as C (ExternVar (..), externVars)
+--import qualified Copilot.Core.External as C (ExternVar (..), externVars)
 
 import Data.Map (Map)
 import Data.List (nub)
@@ -126,8 +126,8 @@ data Arg = Extern    C.Name
 
 argToCall :: Arg -> [String]
 argToCall (Extern name) = [mkExtTmpVar name]
-argToCall (Queue id ) = [ mkQueuePtrVar id
-                        , mkQueueVar id ]
+argToCall (Queue id ) = [ mkQueueVar id 
+                        , mkQueuePtrVar id ]
 
 -- Gathers the names of the arguments to the SBV updateState function so that we
 -- can construct the prototypes.
@@ -149,8 +149,8 @@ instance C.Expr C2Args where
   externVar   _ name = C2Args [Extern name]
 
   externFun   _ name args = 
-    C2Args $ ExternFun name : concatMap (\C.UExpr { C.uExprExpr = exp } 
-                                             -> c2Args exp) 
+    C2Args $ ExternFun name : concatMap (\C.UExpr { C.uExprExpr = expr } 
+                                             -> c2Args expr) 
                                         args
 
   externArray _ _ name idx = C2Args $ ExternArr name : c2Args_ idx

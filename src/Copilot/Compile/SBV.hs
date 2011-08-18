@@ -12,7 +12,7 @@ import Copilot.Compile.Header.C99 (c99HeaderName, genC99Header)
 import qualified Data.SBV as S
 
 import Copilot.Compile.SBV.Driver (driver, driverName)
-import Copilot.Compile.SBV.Makefile (makefile)
+import Copilot.Compile.SBV.Makefile (makefile, makefileName)
 import Copilot.Compile.SBV.Code (updateStates, fireTriggers)
 import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 
@@ -40,7 +40,7 @@ compile fileName spec = do
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver Makefile rules " 
-               ++ fileName ++ "_copilot.mk" ++ " .."
+               ++ makefileName fileName ++ " .."
   makefile fileName fileName
 
   putStrLn "Done."
