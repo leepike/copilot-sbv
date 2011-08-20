@@ -6,8 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Copilot.Compile.SBV.Witness
-  (
-    SymWordInst(..)       , symWordInst
+  ( SymWordInst(..)       , symWordInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
   , BVDivisibleInst(..)   , divInst

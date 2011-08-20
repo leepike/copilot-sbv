@@ -12,6 +12,8 @@ module Copilot.Compile.SBV.MetaTable
   , ExternFunInfoMap
   , TriggerInfo (..)
   , TriggerInfoMap
+  , ObserverInfo (..)
+  , ObserverInfoMap
   , MetaTable (..)
   , allocMetaTable
   , argToCall
@@ -58,20 +60,36 @@ type TriggerInfoMap = Map C.Name TriggerInfo
 
 --------------------------------------------------------------------------------
 
+data ObserverInfo = ObserverInfo
+  { observerArgs :: [String] }
+
+type ObserverInfoMap = Map C.Name ObserverInfo
+
+--------------------------------------------------------------------------------
+
 data MetaTable = MetaTable
   { streamInfoMap     :: StreamInfoMap
   , externInfoMap     :: ExternInfoMap
   , externFunInfoMap  :: ExternFunInfoMap
-  , triggerInfoMap    :: TriggerInfoMap }
+  , triggerInfoMap    :: TriggerInfoMap
+  , observerInfoMap   :: ObserverInfoMap }
 
 --------------------------------------------------------------------------------
 
 allocMetaTable :: C.Spec -> MetaTable
 allocMetaTable spec =
-  let streamInfoMap_  = M.fromList $ map allocStream (C.specStreams spec) in
-  let externInfoMap_  = M.fromList $ map allocExtern (C.externVars spec) in
-  let triggerInfoMap_ = M.fromList $ map allocTrigger (C.specTriggers spec) in
-  MetaTable streamInfoMap_ externInfoMap_ undefined triggerInfoMap_
+  let
+    streamInfoMap_   = M.fromList $ map allocStream (C.specStreams spec)
+    externInfoMap_   = M.fromList $ map allocExtern (C.externVars spec)
+    triggerInfoMap_  = M.fromList $ map allocTrigger (C.specTriggers spec)
+    observerInfoMap_ = M.fromList $ map allocObserver (C.specObservers spec)
+  in
+    MetaTable
+      streamInfoMap_
+      externInfoMap_
+      undefined
+      triggerInfoMap_
+      observerInfoMap_
 
 --------------------------------------------------------------------------------
 
@@ -107,6 +125,17 @@ allocTrigger C.Trigger { C.triggerName  = name
         TriggerInfo { guardArgs      = nub (concatMap argToCall (c2Args guard))
                     , triggerArgArgs = map mkArgArgs args } in
   (name, triggerInfo)
+
+--------------------------------------------------------------------------------
+
+allocObserver :: C.Observer -> (C.Name, ObserverInfo)
+allocObserver C.Observer { C.observerName = name
+                         , C.observerExpr = e } =
+  let
+    observerInfo =
+      ObserverInfo { observerArgs = nub (concatMap argToCall (c2Args e)) }
+  in
+    (name, observerInfo)
 
 --------------------------------------------------------------------------------
 -- Getting SBV function args from the expressions.

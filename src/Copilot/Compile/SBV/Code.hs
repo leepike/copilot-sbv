@@ -7,11 +7,12 @@
 
 module Copilot.Compile.SBV.Code
   ( updateStates
+  , updateObservers
   , fireTriggers
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV
-import Copilot.Compile.SBV.MetaTable 
+import Copilot.Compile.SBV.MetaTable
 import qualified Copilot.Compile.SBV.Witness as W
 import Copilot.Compile.SBV.Common
 
@@ -34,7 +35,7 @@ mkSBVFunc str codeGen = (str, codeGen)
 --------------------------------------------------------------------------------
 
 updateStates :: MetaTable -> C.Spec -> [SBVFunc]
-updateStates meta (C.Spec streams _ _) = 
+updateStates meta (C.Spec streams _ _) =
   map updateStreamState streams
 
   where
@@ -43,9 +44,9 @@ updateStates meta (C.Spec streams _ _) =
                              , C.streamExpr     = e
                              , C.streamExprType = t1
                                                       } =
-    mkSBVFunc (mkUpdateStFn id) $ do 
+    mkSBVFunc (mkUpdateStFn id) $ do
       inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e 
+      let e' = c2sExpr inputs e
       let Just strmInfo = M.lookup id (streamInfoMap meta) 
       updateStreamState1 t1 e' strmInfo
 
@@ -58,8 +59,30 @@ updateStates meta (C.Spec streams _ _) =
 
 --------------------------------------------------------------------------------
 
-fireTriggers :: MetaTable -> C.Spec -> [SBVFunc] 
-fireTriggers meta (C.Spec _ _ triggers) = 
+updateObservers :: MetaTable -> C.Spec -> [SBVFunc]
+updateObservers meta (C.Spec _ observers _) =
+  map updateObs observers
+
+  where
+  updateObs :: C.Observer -> SBVFunc
+  updateObs C.Observer { C.observerName     = name
+                       , C.observerExpr     = e
+                       , C.observerExprType = t } =
+    mkSBVFunc (mkObserverFn name) mkSBVExp
+
+    where
+    mkSBVExp =
+      do
+        inputs <- mkInputs meta (c2Args e)
+        let e' = c2sExpr inputs e
+        W.SymWordInst <- return (W.symWordInst t)
+        W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+        S.cgReturn e'
+
+--------------------------------------------------------------------------------
+
+fireTriggers :: MetaTable -> C.Spec -> [SBVFunc]
+fireTriggers meta (C.Spec _ _ triggers) =
   concatMap fireTrig triggers
 
   where
@@ -69,25 +92,24 @@ fireTriggers meta (C.Spec _ _ triggers) =
                      , C.triggerArgs  = args } =
       mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
     : map (mkTriggerArg name) (mkTriggerArgIdx args)
-    where 
+    where
     mkSBVExp = do
       inputs <- mkInputs meta (c2Args guard)
-      let e = c2sExpr inputs guard 
-      S.cgReturn e 
+      let e = c2sExpr inputs guard
+      S.cgReturn e
 
   mkTriggerArg :: String -> (Int, C.UExpr) -> SBVFunc
   mkTriggerArg name (i, C.UExpr { C.uExprExpr = e
-                                , C.uExprType = t } ) = 
+                                , C.uExprType = t } ) =
     mkSBVFunc (mkTriggerArgFn i name) mkExpr
-    where  
+    where
     mkExpr = do
       inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e 
+      let e' = c2sExpr inputs e
       W.SymWordInst <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-      Just p <- return (t =~= t) 
-      S.cgReturn $ coerce (cong p) e'
-        
+      S.cgReturn e'
+
 --------------------------------------------------------------------------------
 
 -- We first need to analyze the expression, running down it to get all the drop
@@ -96,7 +118,7 @@ fireTriggers meta (C.Spec _ _ triggers) =
 -- call (argToCall from MetaTable.hs).
 
 mkInputs :: MetaTable -> [Arg] -> S.SBVCodeGen [Input]
-mkInputs meta args = 
+mkInputs meta args =
   mapM argToInput args
 
   where
@@ -118,13 +140,12 @@ mkInputs meta args =
      W.SymWordInst        <- return (W.symWordInst t)
      W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
      ext <- S.cgInput (mkExtTmpVar name)
-     Just p <- return (t =~= t)
-     return $ coerce (cong p) ext
+     return ext
 
-  argToInput (Queue id) = 
+  argToInput (Queue id) =
     let strmInfos = streamInfoMap meta in
     let Just strmInfo = M.lookup id strmInfos in
-    mkArrInput strmInfo 
+    mkArrInput strmInfo
 
     where
     mkArrInput :: StreamInfo -> S.SBVCodeGen Input
@@ -134,13 +155,12 @@ mkInputs meta args =
       ptr <- S.cgInput (mkQueuePtrVar id)
 
       return $ ArrIn id (ArrInput (QueueIn { queue   = arr
-                                           , quePtr  = ptr 
+                                           , quePtr  = ptr
                                            , arrType = t }))
 
     mkArrInput_ :: C.Type a -> [a] -> S.SBVCodeGen [S.SBV a]
-    mkArrInput_ t que = do 
+    mkArrInput_ t que = do
       W.SymWordInst        <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       arr <- S.cgInputArr (length que) (mkQueueVar id)
-      Just p <- return (t =~= t)
-      return $ map (coerce $ cong p) arr      
+      return arr

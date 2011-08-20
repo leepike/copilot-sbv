@@ -8,26 +8,27 @@ module Copilot.Compile.SBV.Makefile
   ) where
 
 import Copilot.Compile.SBV.Driver (driverName)
+import Copilot.Compile.SBV.Params
 import Text.PrettyPrint.HughesPJ
 import qualified System.IO as I
 
 --------------------------------------------------------------------------------
 
-makefileName :: String -> String
-makefileName name = name ++ "_copilot.mk"
+makefileName :: Params -> String
+makefileName params = withPrefix (prefix params) "copilot" ++ ".mk"
 
 --------------------------------------------------------------------------------
 
-makefile :: String -> String -> IO ()
-makefile dir fileName = do
-  let filePath = dir ++ '/' : (fileName ++ ".mk")
+makefile :: Params -> String -> IO ()
+makefile params dir = do
+  let filePath = dir ++ '/' : (makefileName params)
+      fileName = "copilot"
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
   wr (text "# Makefile rules for the Copilot driver.")
   wr (text "")
-  wr $ text (driverName fileName) <> colon 
-        <+> text (driverName fileName) <> text ".c"
-        <+> (text fileName <> text ".h")
+  wr $ text (driverName params) <> colon 
+        <+> text (driverName params) <+> text fileName <> text ".h"
   wr $ text "\t" 
          <> (hsep [ text "$" <> braces (text "CC")
                   , text "$" <> braces (text "CCFLAGS")

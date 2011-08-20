@@ -21,6 +21,7 @@ import Text.PrettyPrint.HughesPJ
 import Copilot.Compile.SBV.MetaTable
 import Copilot.Compile.SBV.Queue (QueueSize)
 import Copilot.Compile.SBV.Common
+import Copilot.Compile.SBV.Params
 
 import qualified Copilot.Core as C
 import qualified Copilot.Core.Type.Show as C (showWithType)
@@ -28,8 +29,8 @@ import Copilot.Compile.Header.C99 (c99HeaderName)
 
 --------------------------------------------------------------------------------
 
-driverName :: String -> String
-driverName fileName = fileName ++ "_copilot_driver" 
+driverName :: Params -> String
+driverName params = withPrefix (prefix params) "driver" ++ ".c"
 
 --------------------------------------------------------------------------------
 
@@ -48,9 +49,9 @@ mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
 --------------------------------------------------------------------------------
 
-driver :: MetaTable -> C.Spec -> String -> String -> IO ()
-driver meta (C.Spec streams _ _) dir fileName = do
-  let filePath = dir ++ '/' : driverName fileName ++ ".c"
+driver :: Params -> MetaTable -> C.Spec -> String -> String -> IO ()
+driver params meta (C.Spec streams observers _) dir fileName = do
+  let filePath = dir ++ '/' : driverName params
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
   
@@ -59,13 +60,16 @@ driver meta (C.Spec streams _ _) dir fileName = do
       <+> text "*/")
   wr (text "/*" <+> text "Edit as you see fit" <+> text "*/")
   wr (text "")
-  
+
   wr (text "#include <inttypes.h>")
   wr (text "#include <stdbool.h>")
   wr (text "#include <stdint.h>")
   wr (text "#include <stdio.h>")
   wr (text "#include" <+> doubleQuotes (text fileName <> text ".h"))
-  wr (text "#include" <+> doubleQuotes (text $ c99HeaderName fileName))
+  wr (text "#include" <+> doubleQuotes (text $ c99HeaderName (prefix params)))
+  wr (text "")
+
+  wr (declObservers (prefix params) observers)
   wr (text "")
 
   wr (varDecls meta)
@@ -75,24 +79,26 @@ driver meta (C.Spec streams _ _) dir fileName = do
   wr (text "")
   wr driverFn
 
-  where 
+  where
   mkStyle :: Doc -> String
   mkStyle = renderStyle (style {lineLength = 80})
 
-  driverFn :: Doc 
-  driverFn = 
-    mkFunc ("step_" ++ fileName) 
+  driverFn :: Doc
+  driverFn =
+    mkFunc (withPrefix (prefix params) "step")
            (   mkFuncCall sampleExtsF    [] <> semi
             $$ mkFuncCall updateStatesF  [] <> semi
+            $$ mkFuncCall observersF     [] <> semi
             $$ mkFuncCall triggersF      [] <> semi
             $$ mkFuncCall updateBuffersF [] <> semi
-            $$ mkFuncCall updatePtrsF    [] <> semi) 
+            $$ mkFuncCall updatePtrsF    [] <> semi)
 
   copilot = vcat $ intersperse (text "")
-    [ sampleExts meta 
+    [ sampleExts meta
     , updateStates streams
     , fireTriggers meta
-    , updateBuffers meta  
+    , updateObservers params meta
+    , updateBuffers meta
     , updatePtrs meta ]
 
 --------------------------------------------------------------------------------
@@ -159,9 +165,22 @@ varDecls meta = vcat $ map varDecl (getVars meta)
 
 --------------------------------------------------------------------------------
 
+declObservers :: Maybe String -> [C.Observer] -> Doc
+declObservers prfx = vcat . map declObserver
+
+  where
+  declObserver :: C.Observer -> Doc
+  declObserver
+    C.Observer
+      { C.observerName     = name
+      , C.observerExprType = t } =
+    retType t <+> text (withPrefix prfx name) <> text ";"
+
+--------------------------------------------------------------------------------
+
 sampleExts :: MetaTable -> Doc
-sampleExts MetaTable { externInfoMap = extMap } = 
-  mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap) 
+sampleExts MetaTable { externInfoMap = extMap } =
+  mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap)
 
   where
   sampleExt :: C.Name -> Doc
@@ -170,21 +189,34 @@ sampleExts MetaTable { externInfoMap = extMap } =
 --------------------------------------------------------------------------------
 
 updateStates :: [C.Stream] -> Doc
-updateStates streams = 
+updateStates streams =
   mkFunc updateStatesF $ vcat $ map updateSt streams
 
-  where 
+  where
   -- tmp_X = updateState(arg0, arg1, ... );
   updateSt :: C.Stream -> Doc
-  updateSt C.Stream { C.streamId   = id 
+  updateSt C.Stream { C.streamId   = id
                     , C.streamExpr = e } =
-    text (mkTmpStVar id) <+> equals 
-      <+> mkFuncCall (mkUpdateStFn id) 
-                     (map text getArgs) 
+    text (mkTmpStVar id) <+> equals
+      <+> mkFuncCall (mkUpdateStFn id)
+                     (map text getArgs)
       <> semi
-    where 
+    where
     getArgs :: [String]
     getArgs = concatMap argToCall (c2Args e)
+
+--------------------------------------------------------------------------------
+
+updateObservers :: Params -> MetaTable -> Doc
+updateObservers params MetaTable { observerInfoMap = observers } =
+
+  mkFunc observersF $ vcat $ map updateObsv (M.toList observers)
+
+  where
+  updateObsv :: (C.Name, ObserverInfo) -> Doc
+  updateObsv (name, ObserverInfo { observerArgs = args }) =
+    text (withPrefix (prefix params) name) <+> text "=" <+>
+    mkFuncCall (mkObserverFn name) (map text args) <> semi
 
 --------------------------------------------------------------------------------
 
@@ -197,14 +229,14 @@ fireTriggers MetaTable { triggerInfoMap = triggers } =
   -- if (guard) trigger(args);
   fireTrig :: (C.Name, TriggerInfo) -> Doc
   fireTrig (name, TriggerInfo { guardArgs      = gArgs
-                              , triggerArgArgs = argArgs }) = 
-    text "if" <+> lparen <> guardF <> rparen <+> 
+                              , triggerArgArgs = argArgs }) =
+    text "if" <+> lparen <> guardF <> rparen <+>
       mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
     where
     guardF :: Doc
     guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
     mkArg :: (Int, [String]) -> Doc
-    mkArg (i, args) = 
+    mkArg (i, args) =
       mkFuncCall (mkTriggerArgFn i name) (map text args)
 
 --------------------------------------------------------------------------------
@@ -243,11 +275,12 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
 --------------------------------------------------------------------------------
 
-sampleExtsF, triggersF, updatePtrsF, updateBuffersF, updateStatesF :: String
+sampleExtsF, triggersF, observersF, updatePtrsF, updateBuffersF, updateStatesF :: String
 updatePtrsF    = "updatePtrs"
 updateBuffersF = "updateBuffers"
 updateStatesF  = "updateStates"
 triggersF      = "fireTriggers"
+observersF     = "updateObservers"
 sampleExtsF    = "sampleExts"
 
 --------------------------------------------------------------------------------
@@ -268,4 +301,3 @@ retType t = text $
     C.Word64 _ -> "SWord64"
 
     _          -> error "Error in retType: non-SBV type."
-

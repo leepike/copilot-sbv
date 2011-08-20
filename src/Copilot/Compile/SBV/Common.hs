@@ -8,6 +8,7 @@ module Copilot.Compile.SBV.Common
   , mkQueueVar
   , mkQueuePtrVar
   , mkExtTmpVar
+  , mkObserverFn
   , mkTriggerGuardFn
   , mkTriggerArgFn
   , mkTriggerArgIdx
@@ -33,6 +34,9 @@ mkQueuePtrVar = mkVar "ptr_"
 
 mkExtTmpVar :: String -> String
 mkExtTmpVar = ("ext_" ++)
+
+mkObserverFn :: String -> String
+mkObserverFn = ("observer_" ++)
 
 mkTriggerGuardFn :: String -> String
 mkTriggerGuardFn = ("trigger_guard_" ++)
