@@ -38,7 +38,7 @@ compile params spec = do
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver " ++ driverName params ++ " .."
-  driver params meta spec dirName "driver"
+  driver params meta spec dirName sbvName
 
   putStrLn ""
   putStrLn $ "Generating Copilot header " ++ c99HeaderName (prefix params) ++ " .."

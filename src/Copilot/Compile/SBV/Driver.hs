@@ -8,7 +8,7 @@
 -- external variables, etc.
 
 module Copilot.Compile.SBV.Driver
-  ( driver 
+  ( driver
   , driverName
   ) where
 
@@ -37,15 +37,15 @@ driverName params = withPrefix (prefix params) "driver" ++ ".c"
 -- | Define a C function.
 mkFunc :: String -> Doc -> Doc
 mkFunc fnName doc =
-     text "void" <+> text fnName 
+     text "void" <+> text fnName
        <> lparen <> text "void" <> rparen <+> lbrace
   $$ nest 2 doc $$ nest 0 rbrace
 
 mkArgs :: [Doc] -> Doc
-mkArgs args = hsep (punctuate comma args) 
+mkArgs args = hsep (punctuate comma args)
 
 mkFuncCall :: String -> [Doc] -> Doc
-mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen 
+mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
 --------------------------------------------------------------------------------
 
@@ -54,9 +54,9 @@ driver params meta (C.Spec streams observers _) dir fileName = do
   let filePath = dir ++ '/' : driverName params
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
-  
-  wr (    text "/*" 
-      <+> text "Driver for SBV program generated from Copilot." 
+
+  wr (    text "/*"
+      <+> text "Driver for SBV program generated from Copilot."
       <+> text "*/")
   wr (text "/*" <+> text "Edit as you see fit" <+> text "*/")
   wr (text "")
