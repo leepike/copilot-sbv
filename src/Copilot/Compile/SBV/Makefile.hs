@@ -19,15 +19,15 @@ makefileName params = withPrefix (prefix params) "copilot" ++ ".mk"
 
 --------------------------------------------------------------------------------
 
-makefile :: Params -> String -> IO ()
-makefile params dir = do
+makefile :: Params -> String -> String -> IO ()
+makefile params dir sbvName = do
   let filePath = dir ++ '/' : (makefileName params)
       fileName = "copilot"
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
   wr (text "# Makefile rules for the Copilot driver.")
   wr (text "")
-  wr $ text (driverName params) <> colon 
+  wr $ text "driver" <> colon 
         <+> text (driverName params) <+> text fileName <> text ".h"
   wr $ text "\t" 
          <> (hsep [ text "$" <> braces (text "CC")
@@ -35,7 +35,7 @@ makefile params dir = do
                   , text "$<"
                   , text "-o"
                   , text "$@"
-                  , text fileName <> text ".a"])
+                  , text sbvName <> text ".a"])
 
   where 
   mkStyle :: Doc -> String

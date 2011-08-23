@@ -45,9 +45,9 @@ compile params spec = do
   genC99Header (prefix params) dirName spec
 
   putStrLn ""
-  putStrLn $ "Generating Copilot driver Makefile rules "
+  putStrLn $ "Generating Copilot driver Makefile rules .."
                ++ makefileName params ++ " .."
-  makefile params dirName
+  makefile params dirName sbvName
 
   putStrLn "Done."
 
