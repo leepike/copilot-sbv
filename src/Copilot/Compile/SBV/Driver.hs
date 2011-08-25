@@ -2,7 +2,7 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExistentialQuantification, GADTs #-}
 
 -- | Generates the code around the SBV functions to hold the state-updates,
 -- external variables, etc.
@@ -288,16 +288,16 @@ sampleExtsF    = "sampleExts"
 retType :: C.Type a -> Doc
 retType t = text $
   case t of
-    C.Bool  _ -> "SBool"
+    C.Bool  -> "SBool"
 
-    C.Int8  _ -> "SInt8"
-    C.Int16 _ -> "SInt16"
-    C.Int32 _ -> "SInt32"
-    C.Int64 _ -> "SInt64"
+    C.Int8  -> "SInt8"
+    C.Int16 -> "SInt16"
+    C.Int32 -> "SInt32"
+    C.Int64 -> "SInt64"
 
-    C.Word8  _ -> "SWord8"
-    C.Word16 _ -> "SWord16"
-    C.Word32 _ -> "SWord32"
-    C.Word64 _ -> "SWord64"
+    C.Word8  -> "SWord8"
+    C.Word16 -> "SWord16"
+    C.Word32 -> "SWord32"
+    C.Word64 -> "SWord64"
 
     _          -> error "Error in retType: non-SBV type."

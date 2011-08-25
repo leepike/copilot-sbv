@@ -2,8 +2,7 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE GADTs, ExistentialQuantification #-}
 
 module Copilot.Compile.SBV.Copilot2SBV
   ( c2sExpr
@@ -24,6 +23,7 @@ import qualified Data.SBV.Internals as S
 import qualified Copilot.Compile.SBV.Queue as Q
 import qualified Copilot.Compile.SBV.Witness as W
 
+import Copilot.Core (Op1 (..), Op2 (..), Op3 (..))
 import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
@@ -48,9 +48,8 @@ data QueueIn a = QueueIn
 
 --------------------------------------------------------------------------------
 
-c2sExpr :: [Input] -> (forall e. C.Expr e => e a) -> S.SBV a
-c2sExpr inputs e = 
-  c2sExpr_ e M.empty inputs
+c2sExpr :: [Input] -> C.Expr a -> S.SBV a
+c2sExpr inputs e = c2sExpr_ e M.empty inputs
 
 --------------------------------------------------------------------------------
 
@@ -62,27 +61,15 @@ type Env = Map C.Name Local
 
 --------------------------------------------------------------------------------
 
-newtype C2SExpr a = C2SExpr
-  { c2sExpr_ :: Env -> [Input] -> S.SBV a }
+c2sExpr_ :: C.Expr a -> Env -> [Input] -> S.SBV a
+c2sExpr_ e0 env inputs = case e0 of
 
-newtype C2SOp1 a b = C2SOp1
-  { c2sOp1 :: S.SBV a -> S.SBV b }
-
-newtype C2SOp2 a b c = C2SOp2
-  { c2sOp2 :: S.SBV a -> S.SBV b -> S.SBV c }
-
-newtype C2SOp3 a b c d = C2SOp3
-  { c2sOp3 :: S.SBV a -> S.SBV b -> S.SBV c -> S.SBV d }
-
---------------------------------------------------------------------------------
-
-instance C.Expr C2SExpr where
-  const t x = C2SExpr $ \ _ _ -> 
+  C.Const t x ->
     case W.symWordInst t of W.SymWordInst -> S.literal x
 
   ----------------------------------------------------
 
-  drop t i id = C2SExpr $ \ _ inputs ->
+  C.Drop t i id ->
     let que :: ArrInput
         Just que = foldl 
           ( \acc x -> case x of
@@ -108,14 +95,14 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  local t1 _ name e1 e2 = C2SExpr $ \ env inputs -> 
+  C.Local t1 _ name e1 e2 ->
     let e1' = c2sExpr_ e1 env inputs in
     let env' = M.insert name (Local e1' t1) env in
     c2sExpr_ e2 env' inputs
 
   ----------------------------------------------------
 
-  var t1 name = C2SExpr $ \ env _ ->
+  C.Var t1 name ->
     let Just local = M.lookup name env
     in
       case local of
@@ -128,7 +115,7 @@ instance C.Expr C2SExpr where
 
   ----------------------------------------------------
 
-  externVar t name = C2SExpr $ \ _ inputs -> 
+  C.ExternVar t name ->
     let ext :: ExtInput
         Just ext = foldl 
           ( \acc x -> case x of
@@ -164,20 +151,20 @@ instance C.Expr C2SExpr where
  
   ----------------------------------------------------
 
-  op1 op e = C2SExpr $ \ env inputs -> 
+  C.Op1 op e ->
     let res1 = c2sExpr_ e env inputs in
     c2sOp1 op res1
 
   ----------------------------------------------------
 
-  op2 op e1 e2 = C2SExpr $ \ env inputs -> 
+  C.Op2 op e1 e2 ->
     let res1 = c2sExpr_ e1 env inputs in
     let res2 = c2sExpr_ e2 env inputs in
     c2sOp2 op res1 res2 
 
   ----------------------------------------------------
 
-  op3 op e1 e2 e3 = C2SExpr $ \ env inputs -> 
+  C.Op3 op e1 e2 e3 ->
     let res1 = c2sExpr_ e1 env inputs in
     let res2 = c2sExpr_ e2 env inputs in
     let res3 = c2sExpr_ e3 env inputs in
@@ -195,68 +182,69 @@ noFloatOpsErr op =
 -- eta1 :: (a -> a) -> (a -> S.SBVCodeGen a)
 -- eta1 f = \a -> return $ f a
 
-instance C.Op1 C2SOp1 where
-  not     = C2SOp1 $ \x -> S.ite (x S..== S.false) S.true S.false
-  abs   t = C2SOp1 $ case W.symWordInst t of 
+c2sOp1 :: C.Op1 a b -> S.SBV a -> S.SBV b
+c2sOp1 op = case op of
+  Not     -> \x -> S.ite (x S..== S.false) S.true S.false
+  Abs   t -> case W.symWordInst t of 
                        W.SymWordInst         -> abs 
-  sign  t = C2SOp1 $ case W.symWordInst t of 
+  Sign  t -> case W.symWordInst t of 
                        W.SymWordInst         -> signum
-  bwNot t = C2SOp1 $ case W.bitsInst    t of 
+  BwNot t -> case W.bitsInst    t of 
                        W.BitsInst            -> (S.complement)
 
-  recip _ = noFloatOpsErr "recip"
-  exp   _ = noFloatOpsErr "exp"
-  sqrt  _ = noFloatOpsErr "sqrt"
-  log   _ = noFloatOpsErr "log"
-  sin   _ = noFloatOpsErr "sin"
-  tan   _ = noFloatOpsErr "tan"
-  cos   _ = noFloatOpsErr "cos"
-  asin  _ = noFloatOpsErr "asin"
-  atan  _ = noFloatOpsErr "atan"
-  acos  _ = noFloatOpsErr "acos"
-  sinh  _ = noFloatOpsErr "sinh"
-  tanh  _ = noFloatOpsErr "tanh"
-  cosh  _ = noFloatOpsErr "cosh"
-  asinh _ = noFloatOpsErr "asinh"
-  atanh _ = noFloatOpsErr "atanh"
-  acosh _ = noFloatOpsErr "acosh"
+  Recip _ -> noFloatOpsErr "recip"
+  Exp   _ -> noFloatOpsErr "exp"
+  Sqrt  _ -> noFloatOpsErr "sqrt"
+  Log   _ -> noFloatOpsErr "log"
+  Sin   _ -> noFloatOpsErr "sin"
+  Tan   _ -> noFloatOpsErr "tan"
+  Cos   _ -> noFloatOpsErr "cos"
+  Asin  _ -> noFloatOpsErr "asin"
+  Atan  _ -> noFloatOpsErr "atan"
+  Acos  _ -> noFloatOpsErr "acos"
+  Sinh  _ -> noFloatOpsErr "sinh"
+  Tanh  _ -> noFloatOpsErr "tanh"
+  Cosh  _ -> noFloatOpsErr "cosh"
+  Asinh _ -> noFloatOpsErr "asinh"
+  Atanh _ -> noFloatOpsErr "atanh"
+  Acosh _ -> noFloatOpsErr "acosh"
 
 --------------------------------------------------------------------------------
 
-instance C.Op2 C2SOp2 where
-  and     = C2SOp2 $ \x y -> S.ite (x S..== S.false) 
+c2sOp2 :: C.Op2 a b c -> S.SBV a -> S.SBV b -> S.SBV c
+c2sOp2 op = case op of
+  And     -> \x y -> S.ite (x S..== S.false) 
                                    S.false 
                                    (S.ite (y S..== S.false) S.false S.true)
-  or      = C2SOp2 $ \x y -> S.ite (x S..== S.false) 
+  Or      -> \x y -> S.ite (x S..== S.false) 
                                    (S.ite (y S..== S.false) S.false S.true)
                                    S.true
-  add   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (+)
-  sub   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (-)
-  mul   t = C2SOp2 $ case W.symWordInst  t of W.SymWordInst    ->  (*)
+  Add   t -> case W.symWordInst  t of W.SymWordInst    ->  (+)
+  Sub   t -> case W.symWordInst  t of W.SymWordInst    ->  (-)
+  Mul   t -> case W.symWordInst  t of W.SymWordInst    ->  (*)
 
-  eq    t = C2SOp2 $ case W.eqInst       t of W.EqInst         ->  (S..==)
-  ne    t = C2SOp2 $ case W.eqInst       t of W.EqInst         ->  (S../=)
-  le    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..<=)
-  ge    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..>=)
-  lt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..<)
-  gt    t = C2SOp2 $ case W.ordInst      t of W.OrdInst        ->  (S..>)
+  Eq    t -> case W.eqInst       t of W.EqInst         ->  (S..==)
+  Ne    t -> case W.eqInst       t of W.EqInst         ->  (S../=)
+  Le    t -> case W.ordInst      t of W.OrdInst        ->  (S..<=)
+  Ge    t -> case W.ordInst      t of W.OrdInst        ->  (S..>=)
+  Lt    t -> case W.ordInst      t of W.OrdInst        ->  (S..<)
+  Gt    t -> case W.ordInst      t of W.OrdInst        ->  (S..>)
 
-  div   t = C2SOp2 $ case W.divInst      t of W.BVDivisibleInst  ->  
+  Div   t -> case W.divInst      t of W.BVDivisibleInst  ->  
                                                   \x y -> fst (S.bvQuotRem x y)
-  mod   t = C2SOp2 $ case W.divInst      t of W.BVDivisibleInst  ->  
+  Mod   t -> case W.divInst      t of W.BVDivisibleInst  ->  
                                                   \x y -> snd (S.bvQuotRem x y)
 
-  bwAnd t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S..&.)
-  bwOr  t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S..|.)
-  bwXor t = C2SOp2 $ case W.bitsInst     t of W.BitsInst       -> (S.xor)
+  BwAnd t -> case W.bitsInst     t of W.BitsInst       -> (S..&.)
+  BwOr  t -> case W.bitsInst     t of W.BitsInst       -> (S..|.)
+  BwXor t -> case W.bitsInst     t of W.BitsInst       -> (S.xor)
 
-  fdiv  _ = noFloatOpsErr "fdiv"
-  pow   _ = noFloatOpsErr "pow"
-  logb  _ = noFloatOpsErr "logb"
+  Fdiv  _ -> noFloatOpsErr "fdiv"
+  Pow   _ -> noFloatOpsErr "pow"
+  Logb  _ -> noFloatOpsErr "logb"
 
-instance C.Op3 C2SOp3 where
-  mux t = C2SOp3 $ 
+c2sOp3 :: C.Op3 a b c d -> S.SBV a -> S.SBV b -> S.SBV c -> S.SBV d
+c2sOp3 op = case op of
+  Mux t ->
     case W.mergeableInst t of 
       W.MergeableInst -> \b c1 c2 -> S.ite b c1 c2
-                                  
---------------------------------------------------------------------------------      

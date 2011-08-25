@@ -2,7 +2,7 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExistentialQuantification, GADTs #-}
 
 module Copilot.Compile.SBV.MetaTable
   ( StreamInfo (..)
@@ -108,8 +108,8 @@ allocStream C.Stream
 
 --------------------------------------------------------------------------------
 
-allocExtern :: C.ExternVar -> (C.Name, C.UType)
-allocExtern (C.ExternVar name t) =
+allocExtern :: C.ExtVar -> (C.Name, C.UType)
+allocExtern (C.ExtVar name t) =
   (name, t)
 
 --------------------------------------------------------------------------------
@@ -140,11 +140,8 @@ allocObserver C.Observer { C.observerName = name
 --------------------------------------------------------------------------------
 -- Getting SBV function args from the expressions.
 
-c2Args :: C2Args a -> [Arg]
+c2Args :: C.Expr a -> [Arg]
 c2Args e = nub $ c2Args_ e
-
-newtype C2Args a = C2Args
-  { c2Args_ :: [Arg] }
 
 -- Kinds of arguments to SBV functions
 data Arg = Extern    C.Name
@@ -165,29 +162,28 @@ argToCall (Queue id ) = [ mkQueueVar id
 -- them.  SBV makes the arguments in the order that the cgInput and cgInputArr
 -- are pushed into the SBVCodeGen.  However, there should really be an API for
 -- getting the prototypes.
-instance C.Expr C2Args where
-  const _ _ = C2Args [] 
 
-  drop _ _ id = C2Args [ Queue id ]
+c2Args_ :: C.Expr a -> [Arg]
+c2Args_ e0 = case e0 of
+  C.Const _ _ -> [] 
+
+  C.Drop _ _ id -> [ Queue id ]
  
-  local _ _ _ e1 e2 = 
-    C2Args $ c2Args_ e1 ++ c2Args_ e2
+  C.Local _ _ _ e1 e2 -> c2Args_ e1 ++ c2Args_ e2
 
-  var _ _ = C2Args []
+  C.Var _ _ -> []
 
-  externVar   _ name = C2Args [Extern name]
+  C.ExternVar   _ name -> [Extern name]
 
-  externFun   _ name args = 
-    C2Args $ ExternFun name : concatMap (\C.UExpr { C.uExprExpr = expr } 
+  C.ExternFun   _ name args -> 
+    ExternFun name : concatMap (\C.UExpr { C.uExprExpr = expr } 
                                              -> c2Args expr) 
                                         args
 
-  externArray _ _ name idx = C2Args $ ExternArr name : c2Args_ idx
+  C.ExternArray _ _ name idx -> ExternArr name : c2Args_ idx
 
-  op1 _ e = C2Args (c2Args_ e)
+  C.Op1 _ e -> c2Args_ e
 
-  op2 _ e1 e2 = 
-    C2Args $ c2Args_ e1 ++ c2Args_ e2
+  C.Op2 _ e1 e2 -> c2Args_ e1 ++ c2Args_ e2
 
-  op3 _ e1 e2 e3 = 
-    C2Args $ c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3
+  C.Op3 _ e1 e2 e3 -> c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3
