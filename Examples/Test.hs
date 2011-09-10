@@ -56,35 +56,3 @@ fibSpec = do
 fibC :: IO ()
 fibC = reify fibSpec >>= S.compile "fib" 
 
-{-
-
-(0) Go into the generated XXX directory.
-
-(1) You need to post in something like the following in the generated
-    copilot_driver_XXX.c.  Basically, define the triggers and put in a main that
-    calls the main driver function.
-
-void trig1(SWord64 f, SWord64 x) {
-  printf("trig1: f %llu, three %llu\n", f, x);
-}
-
-void trig2(SWord64 f0, SWord64 f1) {
-  printf("trig2: f0 %llu, f1 %llu\n", f0, f1);
-}
-
-int main (void) {
-  int i=0;
-  for(;i<10;i++) {
-    driver_test();
-//    printf("tmp_0: %i\n", tmp_0);
-  }
-  return 0;
-}
-
-(2) Then open the generated Makefile and change test_driver.c to 
-    copilot_driver_test.c
-
-(3) Type make.
-
--}
-
