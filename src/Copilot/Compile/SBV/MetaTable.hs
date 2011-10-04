@@ -87,7 +87,7 @@ allocMetaTable spec =
     MetaTable
       streamInfoMap_
       externInfoMap_
-      undefined
+      (error "undefined in MetaTable.hs in copilot-sbv.")
       triggerInfoMap_
       observerInfoMap_
 
@@ -175,12 +175,12 @@ c2Args_ e0 = case e0 of
 
   C.ExternVar   _ name -> [Extern name]
 
-  C.ExternFun   _ name args -> 
+  C.ExternFun   _ name args _ -> 
     ExternFun name : concatMap (\C.UExpr { C.uExprExpr = expr } 
                                              -> c2Args expr) 
                                         args
 
-  C.ExternArray _ _ name idx -> ExternArr name : c2Args_ idx
+  C.ExternArray _ _ name idx _ -> ExternArr name : c2Args_ idx
 
   C.Op1 _ e -> c2Args_ e
 
