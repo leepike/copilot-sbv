@@ -24,7 +24,7 @@ import Copilot.Compile.SBV.Common
 import Copilot.Compile.SBV.Params
 
 import qualified Copilot.Core as C
-import qualified Copilot.Core.Type.Show as C (showWithType)
+import qualified Copilot.Core.Type.Show as C (showWithType, ShowType(..))
 import Copilot.Compile.Header.C99 (c99HeaderName)
 
 --------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     Decl (retType t) (text $ mkTmpStVar id) getFirst
     where 
     -- ASSUME queue is nonempty!
-    getFirst = text (cShow $ C.showWithType t (headErr que))
+    getFirst = text (cShow $ C.showWithType C.Haskell t (headErr que))
     headErr [] = error "Error in Copilot.Compile.SBV.Driver: queue nonempty"
     headErr xs = head xs
   
@@ -141,7 +141,8 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     getInits = lbrace <+> vals <+> rbrace
       where 
       vals = hcat $ punctuate (comma <> text " ") 
-                              (map (text . cShow . C.showWithType t) que)
+                              (map (text . cShow . C.showWithType C.Haskell t) 
+                                   que)
 
   getQueuePtrVars :: C.Id -> Decl
   getQueuePtrVars id = 
