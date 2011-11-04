@@ -23,7 +23,7 @@ import qualified Data.SBV.Internals as S
 import qualified Copilot.Compile.SBV.Queue as Q
 import qualified Copilot.Compile.SBV.Witness as W
 
-import Copilot.Core (Op1 (..), Op2 (..), Op3 (..))
+import Copilot.Core (Op1 (..), Op2 (..), Op3 (..), badUsage)
 import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
@@ -174,13 +174,10 @@ c2sExpr_ e0 env inputs = case e0 of
 
 noFloatOpsErr :: String -> a
 noFloatOpsErr op = 
-  error ("Floating/Double operators not supported for the SBV backend: " 
+  badUsage ("Floating/Double operators not supported for the SBV backend: " 
          ++ "operator " ++ op ++ " not supported.")
 
 --------------------------------------------------------------------------------      
-
--- eta1 :: (a -> a) -> (a -> S.SBVCodeGen a)
--- eta1 f = \a -> return $ f a
 
 c2sOp1 :: C.Op1 a b -> S.SBV a -> S.SBV b
 c2sOp1 op = case op of

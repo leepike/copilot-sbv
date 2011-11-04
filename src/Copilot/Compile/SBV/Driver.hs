@@ -128,7 +128,7 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     where 
     -- ASSUME queue is nonempty!
     getFirst = text (cShow $ C.showWithType C.Haskell t (headErr que))
-    headErr [] = error "Error in Copilot.Compile.SBV.Driver: queue nonempty"
+    headErr [] = C.impossible "headErr" "copilot-sbv"
     headErr xs = head xs
   
   getQueueVars :: (C.Id, StreamInfo) -> Decl
@@ -301,4 +301,4 @@ retType t = text $
     C.Word32 -> "SWord32"
     C.Word64 -> "SWord64"
 
-    _          -> error "Error in retType: non-SBV type."
+    _          -> C.badUsage "You've tried to compile a Copilot program to SBV with a type SBV does not support.  SBV does not support floats or doubles.  To compile programs using these types, use the copilot-c99 (Atom) backend.  See README.md for more information."

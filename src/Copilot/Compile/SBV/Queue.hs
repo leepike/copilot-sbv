@@ -15,6 +15,7 @@ import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 
 import Copilot.Core.Expr (DropIdx)
+import Copilot.Core.Error (impossible)
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +31,9 @@ lookahead :: (S.HasSignAndSize a, S.SymWord a)
 lookahead i buf ptr = 
   let sz = fromIntegral $ length buf in
   let (_, rem) = (ptr + fromIntegral i) `S.bvQuotRem` sz in
-  let defaultVal = if null buf then error "lookahead error" else head buf in
+  let defaultVal = if null buf 
+                     then impossible "lookahead" "copilot-sbv"
+                     else head buf                    in
   S.select buf defaultVal rem
 
 --------------------------------------------------------------------------------

@@ -17,9 +17,13 @@ module Copilot.Compile.SBV.Witness
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
-import Copilot.Core.Type.Equality
 
 import Data.Bits
+
+--------------------------------------------------------------------------------
+
+badInst :: a
+badInst = C.impossible "witnesses" "copilot-sbv"
 
 --------------------------------------------------------------------------------
 
@@ -33,8 +37,8 @@ symWordInst t =
     C.Int32  -> SymWordInst ; C.Int64  -> SymWordInst
     C.Word8  -> SymWordInst ; C.Word16 -> SymWordInst
     C.Word32 -> SymWordInst ; C.Word64 -> SymWordInst
-    C.Float  -> error "SymWordInst!" -- !! supress warning !!
-    C.Double -> error "SymWordInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -52,8 +56,8 @@ hasSignAndSizeInst t =
     C.Word16 -> HasSignAndSizeInst
     C.Word32 -> HasSignAndSizeInst 
     C.Word64 -> HasSignAndSizeInst
-    C.Float  -> error "HasSignAndSizeInst!" -- !! supress warning !!
-    C.Double -> error "HasSignAndSizeInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -67,8 +71,8 @@ eqInst t =
     C.Int32  -> EqInst ; C.Int64  -> EqInst
     C.Word8  -> EqInst ; C.Word16 -> EqInst
     C.Word32 -> EqInst ; C.Word64 -> EqInst
-    C.Float  -> error "EqInst!" -- !! supress warning !!
-    C.Double -> error "EqInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -77,17 +81,17 @@ data BVDivisibleInst a = S.BVDivisible (S.SBV a) => BVDivisibleInst
 divInst :: C.Type a -> BVDivisibleInst a
 divInst t =
   case t of
-    C.Bool   -> error "BVDivisibleInst!" -- !! supress warning !!
-    C.Int8   -> error "BVDivisibleInst!" -- !! supress warning !!
-    C.Int16  -> error "BVDivisibleInst!" -- !! supress warning !!
-    C.Int32  -> error "BVDivisibleInst!" -- !! supress warning !!
-    C.Int64  -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Bool   -> badInst
+    C.Int8   -> badInst
+    C.Int16  -> badInst
+    C.Int32  -> badInst
+    C.Int64  -> badInst
     C.Word8  -> BVDivisibleInst
     C.Word16 -> BVDivisibleInst
     C.Word32 -> BVDivisibleInst
     C.Word64 -> BVDivisibleInst
-    C.Float  -> error "BVDivisibleInst!" -- !! supress warning !!
-    C.Double -> error "BVDivisibleInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -101,8 +105,8 @@ ordInst t =
     C.Int32  -> OrdInst ; C.Int64  -> OrdInst
     C.Word8  -> OrdInst ; C.Word16 -> OrdInst
     C.Word32 -> OrdInst ; C.Word64 -> OrdInst
-    C.Float  -> error "OrdInst!" -- !! supress warning !!
-    C.Double -> error "OrdInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -116,8 +120,8 @@ mergeableInst t =
     C.Int32  -> MergeableInst ; C.Int64  -> MergeableInst
     C.Word8  -> MergeableInst ; C.Word16 -> MergeableInst
     C.Word32 -> MergeableInst ; C.Word64 -> MergeableInst
-    C.Float  -> error "MergeableInst!" -- !! supress warning !!
-    C.Double -> error "MergeableInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -126,12 +130,12 @@ data BitsInst a = (Bits a, S.Bits (S.SBV a)) => BitsInst
 bitsInst :: C.Type a -> BitsInst a
 bitsInst t =
   case t of
-    C.Bool   -> error "BitsInst!" -- !! supress warning !!
+    C.Bool   -> badInst
     C.Int8   -> BitsInst ; C.Int16  -> BitsInst
     C.Int32  -> BitsInst ; C.Int64  -> BitsInst
     C.Word8  -> BitsInst ; C.Word16 -> BitsInst
     C.Word32 -> BitsInst ; C.Word64 -> BitsInst
-    C.Float  -> error "BitsInst!" -- !! supress warning !!
-    C.Double -> error "BitsInst!" -- !! supress warning !!
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
