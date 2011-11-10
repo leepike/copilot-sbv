@@ -28,7 +28,7 @@ library
   ghc-prof-options        : -auto-all -caf-all
 
   build-depends           : sbv >= 0.9.21
-                          , base >= 4.3
+                          , base >= 4.3 && < 5
                           , containers >= 0.4
                           , copilot-core
                           , pretty >= 1                         
