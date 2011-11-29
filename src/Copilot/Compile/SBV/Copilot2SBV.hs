@@ -8,7 +8,7 @@ module Copilot.Compile.SBV.Copilot2SBV
   ( c2sExpr
   , Input(..)
   , ExtInput(..)
-  , ArrInput(..)
+  , QueInput(..)
   , QueueIn(..)
   ) 
 where
@@ -26,15 +26,17 @@ import qualified Copilot.Compile.SBV.Witness as W
 
 import Copilot.Core (Op1 (..), Op2 (..), Op3 (..), badUsage)
 import qualified Copilot.Core as C
+import Copilot.Core.Type.Dynamic (fromDynF)
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 
 --------------------------------------------------------------------------------
 
+-- These are all the inputs to the to the SBV expression we're building.
 data Input = 
-    ExtIn  C.Name ExtInput
-  | ExtArr C.Name ExtArrInput
-  | ArrIn  C.Id   ArrInput
+    ExtIn  C.Name ExtInput    -- external variables
+  | ExtArr C.Name ExtArrInput -- external arrays
+  | QueIn  C.Id   QueInput
 
 data ExtInput = forall a. ExtInput 
   { extInput :: S.SBV a
@@ -49,7 +51,7 @@ data ExtArrIdx = forall a. ExtArrIdx
   { extIdx      :: S.SBV a
   , extIdxType  :: C.Type a }
 
-data ArrInput = forall a. ArrInput 
+data QueInput = forall a. QueInput 
   { arrInput :: QueueIn a }
 
 data QueueIn a = QueueIn
@@ -81,18 +83,18 @@ c2sExpr_ e0 env inputs = case e0 of
   ----------------------------------------------------
 
   C.Drop t i id ->
-    let que :: ArrInput
+    let que :: QueInput
         Just que = foldl' f Nothing inputs in
     drop1 t que
 
     where
     f acc x = case x of
-                ArrIn id' q -> if id' == id then Just q 
+                QueIn id' q -> if id' == id then Just q 
                                  else acc
                 ExtIn _ _ -> acc
 
-    drop1 :: C.Type a -> ArrInput -> S.SBV a
-    drop1 t1 ArrInput { arrInput = QueueIn { queue   = que 
+    drop1 :: C.Type a -> QueInput -> S.SBV a
+    drop1 t1 QueInput { arrInput = QueueIn { queue   = que 
                                            , quePtr  = qPtr
                                            , arrType = t2 } } =
       let Just p = t2 =~= t1 in

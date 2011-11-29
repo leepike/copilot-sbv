@@ -145,21 +145,21 @@ mkInputs meta args =
   argToInput (Queue id) =
     let strmInfos = streamInfoMap meta in
     let Just strmInfo = M.lookup id strmInfos in
-    mkArrInput strmInfo
+    mkQueInput strmInfo
 
     where
-    mkArrInput :: StreamInfo -> S.SBVCodeGen Input
-    mkArrInput StreamInfo { streamInfoQueue = que
+    mkQueInput :: StreamInfo -> S.SBVCodeGen Input
+    mkQueInput StreamInfo { streamInfoQueue = que
                           , streamInfoType  = t } = do
-      arr <- mkArrInput_ t que
+      arr <- mkQueInput_ t que
       ptr <- S.cgInput (mkQueuePtrVar id)
 
-      return $ ArrIn id (ArrInput (QueueIn { queue   = arr
+      return $ QueIn id (QueInput (QueueIn { queue   = arr
                                            , quePtr  = ptr
                                            , arrType = t }))
 
-    mkArrInput_ :: C.Type a -> [a] -> S.SBVCodeGen [S.SBV a]
-    mkArrInput_ t que = do
+    mkQueInput_ :: C.Type a -> [a] -> S.SBVCodeGen [S.SBV a]
+    mkQueInput_ t que = do
       W.SymWordInst        <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       arr <- S.cgInputArr (length que) (mkQueueVar id)
