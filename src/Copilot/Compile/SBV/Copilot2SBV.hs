@@ -16,6 +16,7 @@ where
 import Prelude hiding (id)
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.List (foldl')
 
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
@@ -31,19 +32,29 @@ import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 --------------------------------------------------------------------------------
 
 data Input = 
-    ExtIn C.Name ExtInput
-  | ArrIn C.Id ArrInput
+    ExtIn  C.Name ExtInput
+  | ExtArr C.Name ExtArrInput
+  | ArrIn  C.Id   ArrInput
 
 data ExtInput = forall a. ExtInput 
   { extInput :: S.SBV a
   , extType  :: C.Type a }
 
+data ExtArrInput = forall a. ExtArrInput 
+  { extArr      :: [S.SBV a]
+  , extArrType  :: C.Type a 
+  , extArrIdx   :: ExtArrIdx }
+
+data ExtArrIdx = forall a. ExtArrIdx
+  { extIdx      :: S.SBV a
+  , extIdxType  :: C.Type a }
+
 data ArrInput = forall a. ArrInput 
   { arrInput :: QueueIn a }
 
 data QueueIn a = QueueIn
-  { queue  :: [S.SBV a]
-  , quePtr :: S.SBV Q.QueueSize 
+  { queue    :: [S.SBV a]
+  , quePtr   :: S.SBV Q.QueueSize 
   , arrType  :: C.Type a }
 
 --------------------------------------------------------------------------------
@@ -71,17 +82,15 @@ c2sExpr_ e0 env inputs = case e0 of
 
   C.Drop t i id ->
     let que :: ArrInput
-        Just que = foldl 
-          ( \acc x -> case x of
-                        ArrIn id' q -> if id' == id then Just q 
-                                         else acc
-                        ExtIn _ _ -> acc ) 
-          Nothing
-          inputs 
-    in 
+        Just que = foldl' f Nothing inputs in
     drop1 t que
 
     where
+    f acc x = case x of
+                ArrIn id' q -> if id' == id then Just q 
+                                 else acc
+                ExtIn _ _ -> acc
+
     drop1 :: C.Type a -> ArrInput -> S.SBV a
     drop1 t1 ArrInput { arrInput = QueueIn { queue   = que 
                                            , quePtr  = qPtr
@@ -117,21 +126,40 @@ c2sExpr_ e0 env inputs = case e0 of
 
   C.ExternVar t name ->
     let ext :: ExtInput
-        Just ext = foldl 
-          ( \acc x -> case x of
-                        ArrIn _ _ -> acc
-                        ExtIn nm e -> if nm == name then Just e
-                                        else acc ) 
-          Nothing
-          inputs 
-    in getSBV t ext
+        Just ext = foldl' f Nothing inputs in
+    getSBV t ext
 
     where 
+    f acc x = case x of
+                ExtIn nm e -> if nm == name then Just e
+                                else acc 
+                _          -> acc
+
     getSBV :: C.Type a -> ExtInput -> S.SBV a
     getSBV t1 ExtInput { extInput = ext
                        , extType  = t2 } =
       let Just p = t2 =~= t1 in
       coerce (cong p) ext
+
+  ----------------------------------------------------
+
+  -- C.ExternArray tArr tIdx name e _ ->
+  --   let idx = c2sExpr_ e env inputs in
+  --   let extArr :: ExtArrInput
+  --       Just extArr = foldl' f Nothing inputs in
+  --   getSBV tArr extArr
+
+  --   where 
+  --   f acc x = case x of
+  --               ExtArr nm arr -> if nm == name then Just e
+  --                                  else acc 
+  --               _  -> acc
+
+  --   getSBV :: C.Type a -> ExtInput -> S.SBV a
+  --   getSBV t1 ExtInput { extInput = extArr
+  --                      , extType  = t2 } =
+  --     let Just p = t2 =~= t1 in
+  --     coerce (cong p) extArr
 
   ----------------------------------------------------
 
@@ -188,6 +216,9 @@ c2sOp1 op = case op of
                        W.SymWordInst         -> signum
   BwNot t -> case W.bitsInst    t of 
                        W.BitsInst            -> (S.complement)
+
+  Cast t0 t1 -> case W.castInst t0 t1 of 
+                  W.CastInst -> W.sbvCast
 
   Recip _ -> noFloatOpsErr "recip"
   Exp   _ -> noFloatOpsErr "exp"
@@ -254,9 +285,12 @@ c2sOp2 op = case op of
   Pow   _ -> noFloatOpsErr "pow"
   Logb  _ -> noFloatOpsErr "logb"
 
-
 c2sOp3 :: C.Op3 a b c d -> S.SBV a -> S.SBV b -> S.SBV c -> S.SBV d
 c2sOp3 op = case op of
   Mux t ->
     case W.mergeableInst t of 
       W.MergeableInst -> \b c1 c2 -> S.ite b c1 c2
+
+
+--------------------------------------------------------------------------------
+

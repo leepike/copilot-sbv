@@ -2,12 +2,15 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, GADTs #-}
+{-# LANGUAGE FlexibleContexts, GADTs, MultiParamTypeClasses #-}
 
 module Copilot.Compile.SBV.Witness
   ( SymWordInst(..)       , symWordInst
+  , NumInst(..)           , numInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
+--  , SplitInst(..)          , splitInst
+  , CastInst(..)          , castInst   , sbvCast
   , BVDivisibleInst(..)   , divInst
   , OrdInst(..)           , ordInst 
   , MergeableInst(..)     , mergeableInst 
@@ -17,7 +20,10 @@ module Copilot.Compile.SBV.Witness
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
+import qualified Copilot.Core.Type.Show as C
 
+import Data.Word (Word8, Word16, Word32, Word64)
+import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Bits
 
 --------------------------------------------------------------------------------
@@ -37,6 +43,38 @@ symWordInst t =
     C.Int32  -> SymWordInst ; C.Int64  -> SymWordInst
     C.Word8  -> SymWordInst ; C.Word16 -> SymWordInst
     C.Word32 -> SymWordInst ; C.Word64 -> SymWordInst
+    C.Float  -> badInst
+    C.Double -> badInst
+
+--------------------------------------------------------------------------------
+
+-- data SplitInst a b = S.Splittable a b => SplitInst
+
+-- splitInst :: C.Type a -> C.Type b -> SplitInst a b
+-- splitInst t0 t1 =
+--   case t0 of
+--     C.Bool   -> badInst
+--     C.Int8   -> badInst   ; C.Int16  -> badInst
+--     C.Int32  -> badInst   ; C.Int64  -> badInst
+--     C.Word8  -> badInst 
+--     C.Word16 -> case t1 of C.Word8 -> SplitInst  ; _ -> badInst
+--     C.Word32 -> case t1 of C.Word16 -> SplitInst ; _ -> badInst
+--     C.Word64 -> case t1 of C.Word32 -> SplitInst ; _ -> badInst
+--     C.Float  -> badInst
+--     C.Double -> badInst
+
+--------------------------------------------------------------------------------
+
+data NumInst a = Num a => NumInst
+
+numInst :: C.Type a -> NumInst a
+numInst t =
+  case t of
+    C.Bool   -> badInst
+    C.Int8   -> NumInst ; C.Int16  -> NumInst
+    C.Int32  -> NumInst ; C.Int64  -> NumInst
+    C.Word8  -> NumInst ; C.Word16 -> NumInst
+    C.Word32 -> NumInst ; C.Word64 -> NumInst
     C.Float  -> badInst
     C.Double -> badInst
 
@@ -139,3 +177,144 @@ bitsInst t =
     C.Double -> badInst
 
 --------------------------------------------------------------------------------
+
+data CastInst a b = SBVCast a b => CastInst
+
+castInst :: C.Type a -> C.Type b -> CastInst a b
+castInst t0 t1 =
+  case t0 of
+    C.Bool   -> badInst
+    C.Int8   -> badInst   ; C.Int16  -> badInst
+    C.Int32  -> badInst   ; C.Int64  -> badInst
+    C.Word8  -> case t1 of
+                  C.Word8  -> CastInst
+                  C.Word16 -> CastInst
+                  C.Word32 -> CastInst
+                  C.Word64 -> CastInst
+                  _        -> badInst
+--    C.Word16 -> case t1 of C.Word16 -> CastInst  ; _ -> badInst
+--    C.Word32 -> case t1 of C.Word64 -> CastInst ; _ -> badInst
+    C.Word64 -> badInst
+    C.Float  -> badInst
+    C.Double -> badInst
+
+--------------------------------------------------------------------------------
+-- | A class for casting SBV values.  We return errors for casts allowed by
+-- Copilot.
+
+class SBVCast a b where
+  sbvCast :: S.SBV a -> S.SBV b
+
+--------------------------------------------------------------------------------
+
+castBool :: (Num a, S.SymWord a) => S.SBV Bool -> S.SBV a
+castBool x = case S.unliteral x of
+               Just bool -> if bool then 1 else 0
+               Nothing   -> S.ite x 1 0
+
+castErr :: a
+castErr = C.badUsage $ "the SBV backend does not currently support casts to signed word types"
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Bool Bool where
+  sbvCast = id
+instance SBVCast Bool Word8 where
+  sbvCast = castBool
+instance SBVCast Bool Word16 where
+  sbvCast = castBool
+instance SBVCast Bool Word32 where
+  sbvCast = castBool
+instance SBVCast Bool Word64 where
+  sbvCast = castBool
+
+instance SBVCast Bool Int8 where
+  sbvCast = castErr 
+instance SBVCast Bool Int16 where
+  sbvCast = castErr 
+instance SBVCast Bool Int32 where
+  sbvCast = castErr 
+instance SBVCast Bool Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Word8 Word8 where
+  sbvCast = id
+instance SBVCast Word8 Word16 where
+  sbvCast = S.extend
+instance SBVCast Word8 Word32 where
+  sbvCast = S.extend . S.extend
+instance SBVCast Word8 Word64 where
+  sbvCast = S.extend . S.extend . S.extend
+
+instance SBVCast Word8 Int16 where
+  sbvCast = castErr 
+instance SBVCast Word8 Int32 where
+  sbvCast = castErr 
+instance SBVCast Word8 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Word16 Word16 where
+  sbvCast = id
+instance SBVCast Word16 Word32 where
+  sbvCast = S.extend
+instance SBVCast Word16 Word64 where
+  sbvCast = S.extend . S.extend
+
+instance SBVCast Word16 Int32 where
+  sbvCast = castErr 
+instance SBVCast Word16 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Word32 Word32 where
+  sbvCast = id
+instance SBVCast Word32 Word64 where
+  sbvCast = S.extend
+
+instance SBVCast Word32 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Word64 Word64 where
+  sbvCast = id
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Int8 Int8 where
+  sbvCast = castErr 
+instance SBVCast Int8 Int16 where
+  sbvCast = castErr 
+instance SBVCast Int8 Int32 where
+  sbvCast = castErr 
+instance SBVCast Int8 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Int16 Int16 where
+  sbvCast = castErr 
+instance SBVCast Int16 Int32 where
+  sbvCast = castErr 
+instance SBVCast Int16 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Int32 Int32 where
+  sbvCast = castErr 
+instance SBVCast Int32 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
+instance SBVCast Int64 Int64 where
+  sbvCast = castErr 
+
+--------------------------------------------------------------------------------
+
