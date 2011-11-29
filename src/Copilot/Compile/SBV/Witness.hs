@@ -9,7 +9,6 @@ module Copilot.Compile.SBV.Witness
   , NumInst(..)           , numInst
   , HasSignAndSizeInst(..), hasSignAndSizeInst
   , EqInst(..)            , eqInst 
---  , SplitInst(..)          , splitInst
   , CastInst(..)          , castInst   , sbvCast
   , BVDivisibleInst(..)   , divInst
   , OrdInst(..)           , ordInst 
@@ -20,7 +19,6 @@ module Copilot.Compile.SBV.Witness
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
-import qualified Copilot.Core.Type.Show as C
 
 import Data.Word (Word8, Word16, Word32, Word64)
 import Data.Int (Int8, Int16, Int32, Int64)
@@ -45,23 +43,6 @@ symWordInst t =
     C.Word32 -> SymWordInst ; C.Word64 -> SymWordInst
     C.Float  -> badInst
     C.Double -> badInst
-
---------------------------------------------------------------------------------
-
--- data SplitInst a b = S.Splittable a b => SplitInst
-
--- splitInst :: C.Type a -> C.Type b -> SplitInst a b
--- splitInst t0 t1 =
---   case t0 of
---     C.Bool   -> badInst
---     C.Int8   -> badInst   ; C.Int16  -> badInst
---     C.Int32  -> badInst   ; C.Int64  -> badInst
---     C.Word8  -> badInst 
---     C.Word16 -> case t1 of C.Word8 -> SplitInst  ; _ -> badInst
---     C.Word32 -> case t1 of C.Word16 -> SplitInst ; _ -> badInst
---     C.Word64 -> case t1 of C.Word32 -> SplitInst ; _ -> badInst
---     C.Float  -> badInst
---     C.Double -> badInst
 
 --------------------------------------------------------------------------------
 
@@ -181,22 +162,54 @@ bitsInst t =
 data CastInst a b = SBVCast a b => CastInst
 
 castInst :: C.Type a -> C.Type b -> CastInst a b
-castInst t0 t1 =
+castInst t0 t1 = 
   case t0 of
-    C.Bool   -> badInst
-    C.Int8   -> badInst   ; C.Int16  -> badInst
-    C.Int32  -> badInst   ; C.Int64  -> badInst
+    C.Bool   -> case t1 of
+                  C.Bool    -> CastInst
+                  C.Word8   -> CastInst
+                  C.Word16  -> CastInst
+                  C.Word32  -> CastInst
+                  C.Word64  -> CastInst
+                  C.Int8    -> CastInst
+                  C.Int16   -> CastInst
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+
     C.Word8  -> case t1 of
-                  C.Word8  -> CastInst
-                  C.Word16 -> CastInst
-                  C.Word32 -> CastInst
-                  C.Word64 -> CastInst
-                  _        -> badInst
---    C.Word16 -> case t1 of C.Word16 -> CastInst  ; _ -> badInst
---    C.Word32 -> case t1 of C.Word64 -> CastInst ; _ -> badInst
-    C.Word64 -> badInst
-    C.Float  -> badInst
-    C.Double -> badInst
+                  C.Word8   -> CastInst
+                  C.Word16  -> CastInst
+                  C.Word32  -> CastInst
+                  C.Word64  -> CastInst
+                  C.Int16   -> CastInst
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+    C.Word16 -> case t1 of
+                  C.Word16  -> CastInst
+                  C.Word32  -> CastInst
+                  C.Word64  -> CastInst
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+    C.Word32 -> case t1 of
+                  C.Word32  -> CastInst
+                  C.Word64  -> CastInst
+                  C.Int64   -> CastInst
+    C.Word64 -> case t1 of
+                  C.Word64  -> CastInst
+
+    C.Int8   -> case t1 of
+                  C.Int8    -> CastInst
+                  C.Int16   -> CastInst
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+    C.Int16  -> case t1 of
+                  C.Int16   -> CastInst
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+    C.Int32  -> case t1 of
+                  C.Int32   -> CastInst
+                  C.Int64   -> CastInst
+    C.Int64  -> case t1 of
+                  C.Int64   -> CastInst
 
 --------------------------------------------------------------------------------
 -- | A class for casting SBV values.  We return errors for casts allowed by
