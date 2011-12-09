@@ -23,6 +23,7 @@ import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
 
 import qualified Data.Map as M
+import Control.Monad (foldM)
 import Prelude hiding (id)
 
 --------------------------------------------------------------------------------
@@ -43,12 +44,12 @@ updateStates meta (C.Spec streams _ _) =
   updateStreamState C.Stream { C.streamId       = id
                              , C.streamExpr     = e
                              , C.streamExprType = t1
-                                                      } =
-    mkSBVFunc (mkUpdateStFn id) $ do
-      inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e
-      let Just strmInfo = M.lookup id (streamInfoMap meta) 
-      updateStreamState1 t1 e' strmInfo
+                                                      } 
+    = mkSBVFunc (mkUpdateStFn id) $ do
+        inputs <- mkInputs meta (c2Args e)
+        let e' = c2sExpr inputs e
+        let Just strmInfo = M.lookup id (streamInfoMap meta) 
+        updateStreamState1 t1 e' strmInfo
 
   updateStreamState1 :: C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
   updateStreamState1 t1 e1 (StreamInfo _ t2) = do
@@ -117,23 +118,27 @@ fireTriggers meta (C.Spec _ _ triggers) =
 -- expression.  XXX MUST be put in the monad in the same order as the function
 -- call (argToCall from MetaTable.hs).
 
-mkInputs :: MetaTable -> [Arg] -> S.SBVCodeGen [Input]
+mkInputs :: MetaTable -> [Arg] -> S.SBVCodeGen Inputs
 mkInputs meta args =
-  mapM argToInput args
+  foldM argToInput (Inputs [] [] []) args 
 
   where
-  argToInput :: Arg -> S.SBVCodeGen Input
-  argToInput (Extern name) = 
-    let extInfos = externInfoMap meta in
+  argToInput :: Inputs -> Arg -> S.SBVCodeGen Inputs
+ 
+  -- External variables
+  argToInput acc (Extern name) = 
+    let extInfos = externVarInfoMap meta in
     let Just extInfo = M.lookup name extInfos in
     mkExtInput extInfo
 
     where 
-    mkExtInput :: C.UType -> S.SBVCodeGen Input
-    mkExtInput C.UType { C.uTypeType = t } = do
+    mkExtInput :: C.ExtVar -> S.SBVCodeGen Inputs
+    mkExtInput (C.ExtVar _ C.UType { C.uTypeType = t }) = do
       ext <- mkExtInput_ t
-      return $ ExtIn name (ExtInput { extInput = ext 
-                                    , extType  = t })
+      return acc { extVars = (name, (ExtVarInput { extInput = ext 
+                                                 , extType  = t })
+                             ) : extVars acc
+                 }
 
     mkExtInput_ :: C.Type a -> S.SBVCodeGen (S.SBV a)
     mkExtInput_ t = do
@@ -142,25 +147,66 @@ mkInputs meta args =
      ext <- S.cgInput (mkExtTmpVar name)
      return ext
 
-  argToInput (Queue id) =
+-----------------------------------------
+
+-- External arrays
+  argToInput acc (ExternArr name) = 
+    let extInfos = externArrInfoMap meta in
+    let Just extInfo = M.lookup name extInfos in
+    mkExtInput extInfo
+
+    where 
+    mkExtInput :: C.ExtArray -> S.SBVCodeGen Inputs
+    mkExtInput C.ExtArray { C.externArrayElemType = tArr
+                          , C.externArrayIdx      = eIdx
+                          , C.externArrayIdxType  = tIdx
+                          , C.externArraySize     = size
+                          }
+      = do
+      arr <- mkExtInput_ tArr size
+      idxInputs <- mkInputs meta (c2Args eIdx)
+      let idx = c2sExpr idxInputs eIdx
+      return acc { extArrs = (name, ExtArrInput 
+                                      { extArr      = arr
+                                      , extArrType  = tArr
+                                      , extIdx      = idx
+                                      , extIdxType  = tIdx }
+                             ) : extArrs acc
+                 }
+
+    mkExtInput_ :: C.Type a -> Int -> S.SBVCodeGen [S.SBV a]
+    mkExtInput_ t size = do
+     W.SymWordInst        <- return (W.symWordInst t)
+     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+     ext <- S.cgInputArr size (mkExtTmpVar name)
+     return ext
+
+-----------------------------------------
+
+-- Stream queues
+  argToInput acc (Queue id) =
     let strmInfos = streamInfoMap meta in
     let Just strmInfo = M.lookup id strmInfos in
     mkQueInput strmInfo
 
     where
-    mkQueInput :: StreamInfo -> S.SBVCodeGen Input
+    mkQueInput :: StreamInfo -> S.SBVCodeGen Inputs
     mkQueInput StreamInfo { streamInfoQueue = que
                           , streamInfoType  = t } = do
       arr <- mkQueInput_ t que
       ptr <- S.cgInput (mkQueuePtrVar id)
 
-      return $ QueIn id (QueInput (QueueIn { queue   = arr
-                                           , quePtr  = ptr
-                                           , arrType = t }))
-
+      return acc { extQues = (id, QueInput (QueueIn { queue   = arr
+                                                    , quePtr  = ptr
+                                                    , arrType = t })
+                             ) : extQues acc
+                 }
+                   
     mkQueInput_ :: C.Type a -> [a] -> S.SBVCodeGen [S.SBV a]
     mkQueInput_ t que = do
       W.SymWordInst        <- return (W.symWordInst t)
       W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
       arr <- S.cgInputArr (length que) (mkQueueVar id)
       return arr
+
+-----------------------------------------

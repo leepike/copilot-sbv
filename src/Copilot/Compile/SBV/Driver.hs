@@ -115,10 +115,11 @@ varDecls meta = vcat $ map varDecl (getVars meta)
   where
   getVars :: MetaTable -> [Decl] 
   getVars MetaTable { streamInfoMap = streams 
-                    , externInfoMap = externs } = 
+                    , externVarInfoMap = externs } = 
        map getTmpStVars (M.toList streams)
     ++ map getQueueVars (M.toList streams)
     ++ map getQueuePtrVars (map fst $ M.toList streams)
+--    ++ map getExtVars (M.toList externs)
     ++ map getExtVars (M.toList externs)
 
   getTmpStVars :: (C.Id, StreamInfo) -> Decl
@@ -151,8 +152,8 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     queSize :: C.Type QueueSize
     queSize = C.typeOf 
 
-  getExtVars :: (C.Name, C.UType) -> Decl
-  getExtVars (var, C.UType { C.uTypeType = t }) = 
+  getExtVars :: (C.Name, C.ExtVar) -> Decl
+  getExtVars (var, C.ExtVar _ (C.UType { C.uTypeType = t })) = 
     Decl (retType t) (text $ mkExtTmpVar var) (int 0)
 
   varDecl :: Decl -> Doc
@@ -180,7 +181,7 @@ declObservers prfx = vcat . map declObserver
 --------------------------------------------------------------------------------
 
 sampleExts :: MetaTable -> Doc
-sampleExts MetaTable { externInfoMap = extMap } =
+sampleExts MetaTable { externVarInfoMap = extMap } =
   mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap)
 
   where
@@ -194,7 +195,6 @@ updateStates streams =
   mkFunc updateStatesF $ vcat $ map updateSt streams
 
   where
-  -- tmp_X = updateState(arg0, arg1, ... );
   updateSt :: C.Stream -> Doc
   updateSt C.Stream { C.streamId   = id
                     , C.streamExpr = e } =

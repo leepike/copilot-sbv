@@ -6,8 +6,12 @@
 
 module Copilot.Compile.SBV.Copilot2SBV
   ( c2sExpr
-  , Input(..)
-  , ExtInput(..)
+  , Inputs(..)
+  , ExtVar
+  , ExtArr
+  , ExtQue
+  , ExtVarInput(..)
+  , ExtArrInput(..)
   , QueInput(..)
   , QueueIn(..)
   ) 
@@ -16,7 +20,6 @@ where
 import Prelude hiding (id)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.List (foldl')
 
 import qualified Data.SBV as S
 import qualified Data.SBV.Internals as S
@@ -26,31 +29,36 @@ import qualified Copilot.Compile.SBV.Witness as W
 
 import Copilot.Core (Op1 (..), Op2 (..), Op3 (..), badUsage)
 import qualified Copilot.Core as C
-import Copilot.Core.Type.Dynamic (fromDynF)
+import Copilot.Core.Error (impossible)
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 
 --------------------------------------------------------------------------------
 
--- These are all the inputs to the to the SBV expression we're building.
-data Input = 
-    ExtIn  C.Name ExtInput    -- external variables
-  | ExtArr C.Name ExtArrInput -- external arrays
-  | QueIn  C.Id   QueInput
+type ExtVar = (C.Name, ExtVarInput)
+type ExtArr = (C.Name, ExtArrInput)
+type ExtQue = (C.Id, QueInput)
 
-data ExtInput = forall a. ExtInput 
+-- These are all the inputs to the to the SBV expression we're building.
+data Inputs = Inputs
+  { extVars  :: [ExtVar] -- external variables
+  , extArrs  :: [ExtArr] -- external arrays
+  , extQues  :: [ExtQue] }
+
+-- External variables
+data ExtVarInput = forall a. ExtVarInput 
   { extInput :: S.SBV a
   , extType  :: C.Type a }
 
-data ExtArrInput = forall a. ExtArrInput 
+-- External arrays
+data ExtArrInput = 
+  forall a b . Integral b => ExtArrInput 
   { extArr      :: [S.SBV a]
   , extArrType  :: C.Type a 
-  , extArrIdx   :: ExtArrIdx }
+  , extIdx      :: S.SBV b
+  , extIdxType  :: C.Type b }
 
-data ExtArrIdx = forall a. ExtArrIdx
-  { extIdx      :: S.SBV a
-  , extIdxType  :: C.Type a }
-
+-- Stream queues
 data QueInput = forall a. QueInput 
   { arrInput :: QueueIn a }
 
@@ -61,7 +69,7 @@ data QueueIn a = QueueIn
 
 --------------------------------------------------------------------------------
 
-c2sExpr :: [Input] -> C.Expr a -> S.SBV a
+c2sExpr :: Inputs -> C.Expr a -> S.SBV a
 c2sExpr inputs e = c2sExpr_ e M.empty inputs
 
 --------------------------------------------------------------------------------
@@ -74,7 +82,18 @@ type Env = Map C.Name Local
 
 --------------------------------------------------------------------------------
 
-c2sExpr_ :: C.Expr a -> Env -> [Input] -> S.SBV a
+lookupInput :: Eq a => a -> [(a,b)] -> b
+lookupInput id prs =
+  case lookup id prs of
+    Nothing   -> impossible "lookupInput" "copilot-sbv"
+    Just val  -> val
+
+--------------------------------------------------------------------------------
+
+-- Translate a Copilot expression into an SBV expression.  The environment is
+-- for tracking let expression bindings (in the Copilot language), and the list
+-- of inputs are all the external things needed as input to the SBV function.
+c2sExpr_ :: C.Expr a -> Env -> Inputs -> S.SBV a
 c2sExpr_ e0 env inputs = case e0 of
 
   C.Const t x ->
@@ -82,19 +101,13 @@ c2sExpr_ e0 env inputs = case e0 of
 
   ----------------------------------------------------
 
-  C.Drop t i id ->
-    let que :: QueInput
-        Just que = foldl' f Nothing inputs in
-    drop1 t que
-
+  C.Drop t i id -> drop1 t que
     where
-    f acc x = case x of
-                QueIn id' q -> if id' == id then Just q 
-                                 else acc
-                ExtIn _ _ -> acc
+    que :: QueInput
+    que = lookupInput id (extQues inputs)
 
     drop1 :: C.Type a -> QueInput -> S.SBV a
-    drop1 t1 QueInput { arrInput = QueueIn { queue   = que 
+    drop1 t1 QueInput { arrInput = QueueIn { queue   = que'
                                            , quePtr  = qPtr
                                            , arrType = t2 } } =
       let Just p = t2 =~= t1 in
@@ -102,7 +115,7 @@ c2sExpr_ e0 env inputs = case e0 of
         W.SymWordInst -> 
           case W.hasSignAndSizeInst t2 of
             W.HasSignAndSizeInst ->
-              coerce (cong p) (Q.lookahead i que qPtr)
+              coerce (cong p) (Q.lookahead i que' qPtr)
 
   ----------------------------------------------------
 
@@ -126,42 +139,42 @@ c2sExpr_ e0 env inputs = case e0 of
 
   ----------------------------------------------------
 
-  C.ExternVar t name ->
-    let ext :: ExtInput
-        Just ext = foldl' f Nothing inputs in
+  C.ExternVar t name -> 
     getSBV t ext
 
     where 
-    f acc x = case x of
-                ExtIn nm e -> if nm == name then Just e
-                                else acc 
-                _          -> acc
+    ext :: ExtVarInput
+    ext = lookupInput name (extVars inputs) 
 
-    getSBV :: C.Type a -> ExtInput -> S.SBV a
-    getSBV t1 ExtInput { extInput = ext
-                       , extType  = t2 } =
+    getSBV :: C.Type a -> ExtVarInput -> S.SBV a
+    getSBV t1 ExtVarInput { extInput = ext'
+                          , extType  = t2 } =
       let Just p = t2 =~= t1 in
-      coerce (cong p) ext
+      coerce (cong p) ext'
+      
 
   ----------------------------------------------------
 
-  -- C.ExternArray tArr tIdx name e _ ->
-  --   let idx = c2sExpr_ e env inputs in
-  --   let extArr :: ExtArrInput
-  --       Just extArr = foldl' f Nothing inputs in
-  --   getSBV tArr extArr
+  C.ExternArray _ tArr name _ _ _ -> 
+    getSBV tArr getExtArr
 
-  --   where 
-  --   f acc x = case x of
-  --               ExtArr nm arr -> if nm == name then Just e
-  --                                  else acc 
-  --               _  -> acc
+    where 
+    getExtArr :: ExtArrInput
+    getExtArr = lookupInput name (extArrs inputs)
 
-  --   getSBV :: C.Type a -> ExtInput -> S.SBV a
-  --   getSBV t1 ExtInput { extInput = extArr
-  --                      , extType  = t2 } =
-  --     let Just p = t2 =~= t1 in
-  --     coerce (cong p) extArr
+    getSBV tA1 ExtArrInput { extArr     = extArr'
+                           , extArrType = tA2 
+                           , extIdxType = tI2
+                           , extIdx     = idx } 
+      = let Just p = tA2 =~= tA1 in
+        case W.symWordInst tA2 of 
+          W.SymWordInst -> 
+            case W.symWordInst tI2 of
+              W.SymWordInst -> 
+                  case W.bitsInst tI2 of
+                    W.BitsInst -> 
+                        coerce (cong p) 
+                         (extArrLookup extArr' idx)
 
   ----------------------------------------------------
 
@@ -199,6 +212,16 @@ c2sExpr_ e0 env inputs = case e0 of
     let res2 = c2sExpr_ e2 env inputs in
     let res3 = c2sExpr_ e3 env inputs in
     c2sOp3 op res1 res2 res3
+
+extArrLookup :: (S.SymWord a, S.SymWord b, S.Bits b, Integral b) 
+             => [S.SBV a] -> S.SBV b -> S.SBV a
+extArrLookup arr idx = 
+  S.select arr defaultVal idx
+  where
+  defaultVal = 
+    if null arr then impossible "c2Expr_/ExternArray" "copilot-sbv"
+      else head arr
+
 
 --------------------------------------------------------------------------------      
 

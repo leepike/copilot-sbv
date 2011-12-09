@@ -174,6 +174,7 @@ castInst t0 t1 =
                   C.Int16   -> CastInst
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
 
     C.Word8  -> case t1 of
                   C.Word8   -> CastInst
@@ -183,33 +184,43 @@ castInst t0 t1 =
                   C.Int16   -> CastInst
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Word16 -> case t1 of
                   C.Word16  -> CastInst
                   C.Word32  -> CastInst
                   C.Word64  -> CastInst
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Word32 -> case t1 of
                   C.Word32  -> CastInst
                   C.Word64  -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Word64 -> case t1 of
                   C.Word64  -> CastInst
+                  _         -> badInst
 
     C.Int8   -> case t1 of
                   C.Int8    -> CastInst
                   C.Int16   -> CastInst
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Int16  -> case t1 of
                   C.Int16   -> CastInst
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Int32  -> case t1 of
                   C.Int32   -> CastInst
                   C.Int64   -> CastInst
+                  _         -> badInst
     C.Int64  -> case t1 of
                   C.Int64   -> CastInst
+                  _         -> badInst
+    C.Float  -> badInst
+    C.Double -> badInst
 
 --------------------------------------------------------------------------------
 -- | A class for casting SBV values.  We return errors for casts allowed by

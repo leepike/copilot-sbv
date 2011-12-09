@@ -7,7 +7,8 @@
 module Copilot.Compile.SBV.MetaTable
   ( StreamInfo (..)
   , StreamInfoMap
-  , ExternInfoMap
+  , ExternVarInfoMap
+  , ExternArrInfoMap
   , ExternFunInfo (..)
   , ExternFunInfoMap
   , TriggerInfo (..)
@@ -23,7 +24,6 @@ module Copilot.Compile.SBV.MetaTable
 
 import Copilot.Compile.SBV.Common
 import qualified Copilot.Core as C
---import qualified Copilot.Core.External as C (ExternVar (..), externVars)
 
 import Data.Map (Map)
 import Data.List (nub)
@@ -40,7 +40,11 @@ type StreamInfoMap = Map C.Id StreamInfo
 
 --------------------------------------------------------------------------------
 
-type ExternInfoMap = Map C.Name C.UType
+type ExternVarInfoMap = Map C.Name C.ExtVar
+
+--------------------------------------------------------------------------------
+
+type ExternArrInfoMap = Map C.Name C.ExtArray
 
 --------------------------------------------------------------------------------
 
@@ -69,7 +73,8 @@ type ObserverInfoMap = Map C.Name ObserverInfo
 
 data MetaTable = MetaTable
   { streamInfoMap     :: StreamInfoMap
-  , externInfoMap     :: ExternInfoMap
+  , externVarInfoMap  :: ExternVarInfoMap
+  , externArrInfoMap  :: ExternArrInfoMap
   , externFunInfoMap  :: ExternFunInfoMap
   , triggerInfoMap    :: TriggerInfoMap
   , observerInfoMap   :: ObserverInfoMap }
@@ -79,14 +84,16 @@ data MetaTable = MetaTable
 allocMetaTable :: C.Spec -> MetaTable
 allocMetaTable spec =
   let
-    streamInfoMap_   = M.fromList $ map allocStream (C.specStreams spec)
-    externInfoMap_   = M.fromList $ map allocExtern (C.externVars spec)
-    triggerInfoMap_  = M.fromList $ map allocTrigger (C.specTriggers spec)
-    observerInfoMap_ = M.fromList $ map allocObserver (C.specObservers spec)
+    streamInfoMap_    = M.fromList $ map allocStream     (C.specStreams spec)
+    externVarInfoMap_ = M.fromList $ map allocExternVars (C.externVars spec)
+    externArrInfoMap_ = M.fromList $ map allocExternArrs (C.externArrays spec)
+    triggerInfoMap_   = M.fromList $ map allocTrigger    (C.specTriggers spec)
+    observerInfoMap_  = M.fromList $ map allocObserver   (C.specObservers spec)
   in
     MetaTable
       streamInfoMap_
-      externInfoMap_
+      externVarInfoMap_
+      externArrInfoMap_
       (error "undefined in MetaTable.hs in copilot-sbv.")
       triggerInfoMap_
       observerInfoMap_
@@ -108,9 +115,15 @@ allocStream C.Stream
 
 --------------------------------------------------------------------------------
 
-allocExtern :: C.ExtVar -> (C.Name, C.UType)
-allocExtern (C.ExtVar name t) =
-  (name, t)
+allocExternVars :: C.ExtVar -> (C.Name, C.ExtVar)
+allocExternVars var =
+  (C.externVarName var, var)
+
+--------------------------------------------------------------------------------
+
+allocExternArrs :: C.ExtArray -> (C.Name, C.ExtArray)
+allocExternArrs arr =
+  (C.externArrayName arr, arr)
 
 --------------------------------------------------------------------------------
 
@@ -151,9 +164,10 @@ data Arg = Extern    C.Name
   deriving Eq
 
 argToCall :: Arg -> [String]
-argToCall (Extern name) = [mkExtTmpVar name]
-argToCall (Queue id ) = [ mkQueueVar id 
-                        , mkQueuePtrVar id ]
+argToCall (Extern name)       = [mkExtTmpVar name]
+argToCall (ExternArr name)    = [mkExtTmpVar name]
+argToCall (Queue id )         = [ mkQueueVar id 
+                                , mkQueuePtrVar id ]
 
 -- Gathers the names of the arguments to the SBV updateState function so that we
 -- can construct the prototypes.
@@ -180,7 +194,7 @@ c2Args_ e0 = case e0 of
                                              -> c2Args expr) 
                                         args
 
-  C.ExternArray _ _ name idx _ -> ExternArr name : c2Args_ idx
+  C.ExternArray _ _ name _ idx _ -> ExternArr name : c2Args_ idx
 
   C.Op1 _ e -> c2Args_ e
 
