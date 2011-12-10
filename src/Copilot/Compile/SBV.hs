@@ -14,7 +14,8 @@ import qualified Data.SBV as S
 
 import Copilot.Compile.SBV.Driver (driver, driverName)
 import Copilot.Compile.SBV.Makefile (makefile, makefileName)
-import Copilot.Compile.SBV.Code (updateStates, updateObservers, fireTriggers)
+import Copilot.Compile.SBV.Code 
+  (updateStates, updateObservers, fireTriggers, getExtArrs)
 import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 import Copilot.Compile.SBV.Params
 
@@ -34,7 +35,9 @@ compile params spec = do
     sbvName
     (  updateStates    meta spec
     ++ updateObservers meta spec
-    ++ fireTriggers    meta spec )
+    ++ fireTriggers    meta spec 
+    ++ getExtArrs      meta 
+    )
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver " ++ driverName params ++ " .."

@@ -44,6 +44,7 @@ mkFunc fnName doc =
 mkArgs :: [Doc] -> Doc
 mkArgs args = hsep (punctuate comma args)
 
+-- | Call a C function.
 mkFuncCall :: String -> [Doc] -> Doc
 mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 
@@ -103,7 +104,7 @@ driver params meta (C.Spec streams observers _) dir fileName = do
 
 --------------------------------------------------------------------------------
 
--- Declare gloabl variables.
+-- Declare global variables.
 
 data Decl = Decl { retT    :: Doc
                  , declVar :: Doc
@@ -119,7 +120,6 @@ varDecls meta = vcat $ map varDecl (getVars meta)
        map getTmpStVars (M.toList streams)
     ++ map getQueueVars (M.toList streams)
     ++ map getQueuePtrVars (map fst $ M.toList streams)
---    ++ map getExtVars (M.toList externs)
     ++ map getExtVars (M.toList externs)
 
   getTmpStVars :: (C.Id, StreamInfo) -> Decl
@@ -176,43 +176,52 @@ declObservers prfx = vcat . map declObserver
     C.Observer
       { C.observerName     = name
       , C.observerExprType = t } =
-    retType t <+> text (withPrefix prfx name) <> text ";"
+    retType t <+> text (withPrefix prfx name) <> semi
 
 --------------------------------------------------------------------------------
 
 sampleExts :: MetaTable -> Doc
-sampleExts MetaTable { externVarInfoMap = extMap } =
-  mkFunc sampleExtsF $ vcat $ map sampleExt ((fst . unzip . M.toList) extMap)
+sampleExts MetaTable { externVarInfoMap = extVMap
+                     , externArrInfoMap = extAMap } 
+  =
+  mkFunc sampleExtsF $ vcat (extVars ++ extArrs)
 
   where
-  sampleExt :: C.Name -> Doc
-  sampleExt name = text (mkExtTmpVar name) <+> equals <+> text name <> semi
+  -- Variables
+  extVars = map sampleVExt ((fst . unzip . M.toList) extVMap)
+  extArrs = map sampleAExt (M.toList extAMap)
+
+  sampleVExt :: C.Name -> Doc
+  sampleVExt name = text (mkExtTmpVar name) <+> equals <+> text name <> semi
+
+  -- Arrays
+  sampleAExt :: (C.Name, C.ExtArray) -> Doc
+  sampleAExt (name, C.ExtArray { C.externArrayIdx = idx }) = 
+    text (mkExtTmpVar name) <+> equals <+> text name 
+    <> lbrack <> idxArgs <> rbrack <> semi
+    where 
+    idxArgs = mkFuncCall (mkExtArrFn name) (map text $ collectArgs idx)
 
 --------------------------------------------------------------------------------
 
 updateStates :: [C.Stream] -> Doc
 updateStates streams =
   mkFunc updateStatesF $ vcat $ map updateSt streams
-
   where
   updateSt :: C.Stream -> Doc
   updateSt C.Stream { C.streamId   = id
                     , C.streamExpr = e } =
     text (mkTmpStVar id) <+> equals
       <+> mkFuncCall (mkUpdateStFn id)
-                     (map text getArgs)
-      <> semi
-    where
-    getArgs :: [String]
-    getArgs = concatMap argToCall (c2Args e)
+                     (map text $ collectArgs e)
+      <>  semi
 
 --------------------------------------------------------------------------------
 
 updateObservers :: Params -> MetaTable -> Doc
-updateObservers params MetaTable { observerInfoMap = observers } =
-
+updateObservers params MetaTable { observerInfoMap = observers } 
+  =
   mkFunc observersF $ vcat $ map updateObsv (M.toList observers)
-
   where
   updateObsv :: (C.Name, ObserverInfo) -> Doc
   updateObsv (name, ObserverInfo { observerArgs = args }) =
@@ -222,20 +231,23 @@ updateObservers params MetaTable { observerInfoMap = observers } =
 --------------------------------------------------------------------------------
 
 fireTriggers :: MetaTable -> Doc
-fireTriggers MetaTable { triggerInfoMap = triggers } =
-
+fireTriggers MetaTable { triggerInfoMap = triggers } 
+  =
   mkFunc triggersF $ vcat $ map fireTrig (M.toList triggers)
 
   where
   -- if (guard) trigger(args);
   fireTrig :: (C.Name, TriggerInfo) -> Doc
   fireTrig (name, TriggerInfo { guardArgs      = gArgs
-                              , triggerArgArgs = argArgs }) =
-    text "if" <+> lparen <> guardF <> rparen <+>
-      mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi
+                              , triggerArgArgs = argArgs }) 
+    = 
+    let f = mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi in
+    text "if" <+> lparen <> guardF <> rparen $+$ nest 2 f
+
     where
     guardF :: Doc
     guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
+
     mkArg :: (Int, [String]) -> Doc
     mkArg (i, args) =
       mkFuncCall (mkTriggerArgFn i name) (map text args)
@@ -243,7 +255,8 @@ fireTriggers MetaTable { triggerInfoMap = triggers } =
 --------------------------------------------------------------------------------
 
 updateBuffers :: MetaTable -> Doc
-updateBuffers MetaTable { streamInfoMap = strMap } =
+updateBuffers MetaTable { streamInfoMap = strMap } 
+  =
   mkFunc updateBuffersF $ vcat $ map updateBuf (M.toList strMap)
 
   where
@@ -276,7 +289,8 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
 
 --------------------------------------------------------------------------------
 
-sampleExtsF, triggersF, observersF, updatePtrsF, updateBuffersF, updateStatesF :: String
+sampleExtsF, triggersF, observersF, updatePtrsF :: String
+updateBuffersF, updateStatesF :: String
 updatePtrsF    = "updatePtrs"
 updateBuffersF = "updateBuffers"
 updateStatesF  = "updateStates"

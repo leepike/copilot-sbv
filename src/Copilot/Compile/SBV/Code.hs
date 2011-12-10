@@ -9,6 +9,7 @@ module Copilot.Compile.SBV.Code
   ( updateStates
   , updateObservers
   , fireTriggers
+  , getExtArrs
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV
@@ -113,13 +114,38 @@ fireTriggers meta (C.Spec _ _ triggers) =
 
 --------------------------------------------------------------------------------
 
--- We first need to analyze the expression, running down it to get all the drop
--- ids and externals mentioned in it.  The we use those inputs to process the
--- expression.  XXX MUST be put in the monad in the same order as the function
--- call (argToCall from MetaTable.hs).
+-- Generate an SBV function that calculates the Copilot expression to get the
+-- next index to sample an external array.
+getExtArrs :: MetaTable -> [SBVFunc]
+getExtArrs meta@(MetaTable { externArrInfoMap = arrs })
+  = map mkIdx (M.toList arrs)
+  
+  where
+  mkIdx :: (C.Name, C.ExtArray) -> SBVFunc
+  mkIdx (name, C.ExtArray { C.externArrayIdx     = idx
+                          , C.externArrayIdxType = t   })
+    = 
+    mkSBVFunc (mkExtArrFn name) mkSBVExpr
+    where
+    mkSBVExpr :: S.SBVCodeGen ()
+    mkSBVExpr = do
+      inputs <- mkInputs meta (c2Args idx)
+      W.SymWordInst <- return (W.symWordInst t)
+      W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+      S.cgReturn (c2sExpr inputs idx)
+
+--------------------------------------------------------------------------------
+
+-- mkInputs takes the datatype containing the entire spec (meta) as well as all
+-- possible arguments to the SBV function generating the expression.  From those
+-- arguments, it then generates in the SBVCodeGen monad the actual Inputs ---
+-- the queues to hold streams as well as external variables.
+
+-- XXX MUST be put in the monad in the same order as the function call
+-- (argToCall from MetaTable.hs).
 
 mkInputs :: MetaTable -> [Arg] -> S.SBVCodeGen Inputs
-mkInputs meta args =
+mkInputs meta args = 
   foldM argToInput (Inputs [] [] []) args 
 
   where
@@ -163,16 +189,15 @@ mkInputs meta args =
                           , C.externArraySize     = size
                           }
       = do
-      arr <- mkExtInput_ tArr size
+      arr       <- mkExtInput_ tArr size
       idxInputs <- mkInputs meta (c2Args eIdx)
-      let idx = c2sExpr idxInputs eIdx
+      let idx   =  c2sExpr idxInputs eIdx
       return acc { extArrs = (name, ExtArrInput 
                                       { extArr      = arr
                                       , extArrType  = tArr
                                       , extIdx      = idx
                                       , extIdxType  = tIdx }
-                             ) : extArrs acc
-                 }
+                             ) : extArrs acc }
 
     mkExtInput_ :: C.Type a -> Int -> S.SBVCodeGen [S.SBV a]
     mkExtInput_ t size = do

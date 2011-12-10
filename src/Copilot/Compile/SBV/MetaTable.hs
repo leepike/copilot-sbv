@@ -17,7 +17,7 @@ module Copilot.Compile.SBV.MetaTable
   , ObserverInfoMap
   , MetaTable (..)
   , allocMetaTable
-  , argToCall
+  , collectArgs
   , Arg(..)
   , c2Args
   ) where
@@ -130,12 +130,12 @@ allocExternArrs arr =
 allocTrigger :: C.Trigger -> (C.Name, TriggerInfo)
 allocTrigger C.Trigger { C.triggerName  = name
                        , C.triggerGuard = guard
-                       , C.triggerArgs  = args } = 
+                       , C.triggerArgs  = args } 
+  =
   let mkArgArgs :: C.UExpr -> [String]
-      mkArgArgs C.UExpr { C.uExprExpr = e } = 
-        nub (concatMap argToCall (c2Args e)) in
+      mkArgArgs C.UExpr { C.uExprExpr = e } = collectArgs e in
   let triggerInfo = 
-        TriggerInfo { guardArgs      = nub (concatMap argToCall (c2Args guard))
+        TriggerInfo { guardArgs      = collectArgs guard 
                     , triggerArgArgs = map mkArgArgs args } in
   (name, triggerInfo)
 
@@ -143,18 +143,12 @@ allocTrigger C.Trigger { C.triggerName  = name
 
 allocObserver :: C.Observer -> (C.Name, ObserverInfo)
 allocObserver C.Observer { C.observerName = name
-                         , C.observerExpr = e } =
-  let
-    observerInfo =
-      ObserverInfo { observerArgs = nub (concatMap argToCall (c2Args e)) }
-  in
-    (name, observerInfo)
+                         , C.observerExpr = e } 
+  = 
+  let observerInfo = ObserverInfo { observerArgs = collectArgs e } in
+  (name, observerInfo)
 
 --------------------------------------------------------------------------------
--- Getting SBV function args from the expressions.
-
-c2Args :: C.Expr a -> [Arg]
-c2Args e = nub $ c2Args_ e
 
 -- Kinds of arguments to SBV functions
 data Arg = Extern    C.Name
@@ -169,6 +163,13 @@ argToCall (ExternArr name)    = [mkExtTmpVar name]
 argToCall (Queue id )         = [ mkQueueVar id 
                                 , mkQueuePtrVar id ]
 
+--------------------------------------------------------------------------------
+
+collectArgs :: C.Expr a -> [String]
+collectArgs e = nub (concatMap argToCall (c2Args e))
+
+--------------------------------------------------------------------------------
+
 -- Gathers the names of the arguments to the SBV updateState function so that we
 -- can construct the prototypes.
 
@@ -177,15 +178,18 @@ argToCall (Queue id )         = [ mkQueueVar id
 -- are pushed into the SBVCodeGen.  However, there should really be an API for
 -- getting the prototypes.
 
+c2Args :: C.Expr a -> [Arg]
+c2Args e = nub $ c2Args_ e
+
 c2Args_ :: C.Expr a -> [Arg]
 c2Args_ e0 = case e0 of
-  C.Const _ _ -> [] 
+  C.Const _ _          -> [] 
 
-  C.Drop _ _ id -> [ Queue id ]
+  C.Drop _ _ id        -> [ Queue id ]
  
-  C.Local _ _ _ e1 e2 -> c2Args_ e1 ++ c2Args_ e2
+  C.Local _ _ _ e1 e2  -> c2Args_ e1 ++ c2Args_ e2
 
-  C.Var _ _ -> []
+  C.Var _ _            -> []
 
   C.ExternVar   _ name -> [Extern name]
 
@@ -194,10 +198,12 @@ c2Args_ e0 = case e0 of
                                              -> c2Args expr) 
                                         args
 
-  C.ExternArray _ _ name _ idx _ -> ExternArr name : c2Args_ idx
+  C.ExternArray _ _ name _ _  _ -> [ExternArr name] -- : c2Args_ idx
 
-  C.Op1 _ e -> c2Args_ e
+  C.Op1 _ e        -> c2Args_ e
 
-  C.Op2 _ e1 e2 -> c2Args_ e1 ++ c2Args_ e2
+  C.Op2 _ e1 e2    -> c2Args_ e1 ++ c2Args_ e2
 
   C.Op3 _ e1 e2 e3 -> c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3
+
+--------------------------------------------------------------------------------

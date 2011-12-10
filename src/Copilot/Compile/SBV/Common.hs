@@ -2,12 +2,15 @@
 -- Copyright © 2011 National Institute of Aerospace / Galois, Inc.
 --------------------------------------------------------------------------------
 
+-- Builds names of functions and variables used.
+
 module Copilot.Compile.SBV.Common
   ( mkTmpStVar
   , mkUpdateStFn
   , mkQueueVar
   , mkQueuePtrVar
   , mkExtTmpVar
+  , mkExtArrFn
   , mkObserverFn
   , mkTriggerGuardFn
   , mkTriggerArgFn
@@ -35,14 +38,17 @@ mkQueuePtrVar = mkVar "ptr_"
 mkExtTmpVar :: String -> String
 mkExtTmpVar = ("ext_" ++)
 
+mkExtArrFn :: String -> String
+mkExtArrFn = (++) "mk_ext_arr_"
+
 mkObserverFn :: String -> String
-mkObserverFn = ("observer_" ++)
+mkObserverFn = ("mk_observer_" ++)
 
 mkTriggerGuardFn :: String -> String
-mkTriggerGuardFn = ("trigger_guard_" ++)
+mkTriggerGuardFn = ("mk_trigger_guard_" ++)
 
 mkTriggerArgFn :: Int -> String -> String
-mkTriggerArgFn i nm = "trigger_" ++ nm ++ "_arg_" ++ show i
+mkTriggerArgFn i nm = "mk_trigger_" ++ nm ++ "_arg_" ++ show i
 
 mkTriggerArgIdx :: [a] -> [(Int, a)]
 mkTriggerArgIdx args = zip [0,1 ..] args

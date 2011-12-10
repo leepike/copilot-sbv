@@ -32,7 +32,6 @@ import qualified Copilot.Core as C
 import Copilot.Core.Error (impossible)
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
-
 --------------------------------------------------------------------------------
 
 type ExtVar = (C.Name, ExtVarInput)
