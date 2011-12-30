@@ -21,7 +21,7 @@ import Data.Map (Map)
 import qualified Data.Map as M
 
 import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
+--import qualified Data.SBV.Internals as S
 
 import qualified Copilot.Compile.SBV.Queue as Q
 import qualified Copilot.Compile.SBV.Witness as W
@@ -130,7 +130,7 @@ c2sExpr_ e0 env inputs = case e0 of
 
   ----------------------------------------------------
 
-  C.ExternVar t name -> 
+  C.ExternVar t name _ -> 
     getSBV t ext
 
     where 
@@ -145,7 +145,7 @@ c2sExpr_ e0 env inputs = case e0 of
 
   ----------------------------------------------------
 
-  C.ExternArray _ t name _ _ _ -> 
+  C.ExternArray _ t name _ _ _ _ -> 
     getSBV t getExtArr
 
     where 

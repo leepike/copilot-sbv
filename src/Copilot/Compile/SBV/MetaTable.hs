@@ -170,15 +170,15 @@ c2Args e = nub $ c2Args_ e
 
 c2Args_ :: C.Expr a -> [Arg]
 c2Args_ e0 = case e0 of
-  C.Const _ _          -> [] 
+  C.Const _ _            -> [] 
 
-  C.Drop _ _ id        -> [ Queue id ]
+  C.Drop _ _ id          -> [ Queue id ]
  
-  C.Local _ _ _ e1 e2  -> c2Args_ e1 ++ c2Args_ e2
+  C.Local _ _ _ e1 e2    -> c2Args_ e1 ++ c2Args_ e2
 
-  C.Var _ _            -> []
+  C.Var _ _              -> []
 
-  C.ExternVar   _ name -> [Extern name]
+  C.ExternVar   _ name _ -> [Extern name]
 
   C.ExternFun   _ name args _ tag -> 
     (ExternFun name (fromJust tag)) : 
@@ -186,7 +186,7 @@ c2Args_ e0 = case e0 of
                      -> c2Args expr) 
                 args
 
-  C.ExternArray _ _ name _ _ _ -> [ExternArr name] 
+  C.ExternArray _ _ name _ _ _ _  -> [ExternArr name] 
 
   C.Op1 _ e        -> c2Args_ e
 
