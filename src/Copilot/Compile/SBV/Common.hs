@@ -10,6 +10,7 @@ module Copilot.Compile.SBV.Common
   , mkQueueVar
   , mkQueuePtrVar
   , mkExtTmpVar
+  , mkExtTmpFun
   , mkExtArrFn
   , mkObserverFn
   , mkTriggerGuardFn
@@ -17,7 +18,7 @@ module Copilot.Compile.SBV.Common
   , mkTriggerArgIdx
   ) where
 
-import Copilot.Core (Id)
+import Copilot.Core (Id, Tag)
 import Prelude hiding (id)
 
 mkVar :: String -> Id -> String
@@ -37,6 +38,9 @@ mkQueuePtrVar = mkVar "ptr_"
 
 mkExtTmpVar :: String -> String
 mkExtTmpVar = ("ext_" ++)
+
+mkExtTmpFun :: String -> Tag -> String
+mkExtTmpFun name tag = "ext_" ++ name ++ "_" ++ show tag
 
 mkExtArrFn :: String -> String
 mkExtArrFn = (++) "mk_ext_arr_"

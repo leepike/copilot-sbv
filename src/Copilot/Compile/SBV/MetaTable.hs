@@ -5,11 +5,11 @@
 {-# LANGUAGE ExistentialQuantification, GADTs #-}
 
 module Copilot.Compile.SBV.MetaTable
-  ( StreamInfo (..)
-  , StreamInfoMap
+  ( --StreamInfo (..)
+    StreamInfoMap
   , ExternVarInfoMap
   , ExternArrInfoMap
-  , ExternFunInfo (..)
+--  , ExternFunInfo (..)
   , ExternFunInfoMap
   , TriggerInfo (..)
   , TriggerInfoMap
@@ -27,32 +27,16 @@ import qualified Copilot.Core as C
 
 import Data.Map (Map)
 import Data.List (nub)
+import Data.Maybe (fromJust)
 import qualified Data.Map as M
 import Prelude hiding (id)
 
 --------------------------------------------------------------------------------
 
-data StreamInfo = forall a . StreamInfo
-  { streamInfoQueue   :: [a]
-  , streamInfoType    :: C.Type a }
-
-type StreamInfoMap = Map C.Id StreamInfo
-
---------------------------------------------------------------------------------
-
+type StreamInfoMap = Map C.Id C.Stream
 type ExternVarInfoMap = Map C.Name C.ExtVar
-
---------------------------------------------------------------------------------
-
 type ExternArrInfoMap = Map C.Name C.ExtArray
-
---------------------------------------------------------------------------------
-
-data ExternFunInfo = forall a . ExternFunInfo
-  { externFunInfoArgs :: [(C.UType, C.UExpr)]
-  , externFunInfoType :: C.Type a }
-
-type ExternFunInfoMap = Map C.Name ExternFunInfo
+type ExternFunInfoMap = Map C.Name C.ExtFun
 
 --------------------------------------------------------------------------------
 
@@ -87,31 +71,23 @@ allocMetaTable spec =
     streamInfoMap_    = M.fromList $ map allocStream     (C.specStreams spec)
     externVarInfoMap_ = M.fromList $ map allocExternVars (C.externVars spec)
     externArrInfoMap_ = M.fromList $ map allocExternArrs (C.externArrays spec)
+    externFunInfoMap_ = M.fromList $ map allocExternFuns (C.externFuns spec)
     triggerInfoMap_   = M.fromList $ map allocTrigger    (C.specTriggers spec)
     observerInfoMap_  = M.fromList $ map allocObserver   (C.specObservers spec)
   in
-    MetaTable
-      streamInfoMap_
-      externVarInfoMap_
-      externArrInfoMap_
-      (error "undefined in MetaTable.hs in copilot-sbv.")
-      triggerInfoMap_
-      observerInfoMap_
-
+    MetaTable { streamInfoMap    = streamInfoMap_
+              , externVarInfoMap = externVarInfoMap_
+              , externArrInfoMap = externArrInfoMap_
+              , externFunInfoMap = externFunInfoMap_
+              , triggerInfoMap   = triggerInfoMap_
+              , observerInfoMap  = observerInfoMap_
+              }
+      
 --------------------------------------------------------------------------------
 
-allocStream :: C.Stream -> (C.Id, StreamInfo)
-allocStream C.Stream
-              { C.streamId       = id
-              , C.streamBuffer   = buf
-              , C.streamExprType = t
-              } =
-  let
-    strmInfo =
-      StreamInfo
-        { streamInfoQueue       = buf
-        , streamInfoType        = t } in
-  (id, strmInfo)
+allocStream :: C.Stream -> (C.Id, C.Stream)
+allocStream strm = 
+  (C.streamId strm, strm)
 
 --------------------------------------------------------------------------------
 
@@ -124,6 +100,12 @@ allocExternVars var =
 allocExternArrs :: C.ExtArray -> (C.Name, C.ExtArray)
 allocExternArrs arr =
   (C.externArrayName arr, arr)
+
+--------------------------------------------------------------------------------
+
+allocExternFuns :: C.ExtFun -> (C.Name, C.ExtFun)
+allocExternFuns fun =
+  (C.externFunName fun, fun)
 
 --------------------------------------------------------------------------------
 
@@ -152,21 +134,26 @@ allocObserver C.Observer { C.observerName = name
 
 -- Kinds of arguments to SBV functions
 data Arg = Extern    C.Name
-         | ExternFun C.Name
+         | ExternFun C.Name C.Tag
          | ExternArr C.Name
          | Queue     C.Id
   deriving Eq
 
+-- | Normal argument calls.
 argToCall :: Arg -> [String]
-argToCall (Extern name)       = [mkExtTmpVar name]
-argToCall (ExternArr name)    = [mkExtTmpVar name]
-argToCall (Queue id )         = [ mkQueueVar id 
-                                , mkQueuePtrVar id ]
+argToCall (Extern name)        = [mkExtTmpVar name]
+argToCall (ExternArr name)     = [mkExtTmpVar name]
+argToCall (ExternFun name tag) = [mkExtTmpFun name tag]
+argToCall (Queue id)           = [ mkQueueVar id 
+                                 , mkQueuePtrVar id ]
 
 --------------------------------------------------------------------------------
 
 collectArgs :: C.Expr a -> [String]
-collectArgs e = nub (concatMap argToCall (c2Args e))
+collectArgs e = concatMap argToCall (nub $ c2Args e)
+
+-- extCollectArgs :: C.Expr a -> [String]
+-- extCollectArgs e = nub (concatMap extArgToCall (c2Args e))
 
 --------------------------------------------------------------------------------
 
@@ -193,12 +180,13 @@ c2Args_ e0 = case e0 of
 
   C.ExternVar   _ name -> [Extern name]
 
-  C.ExternFun   _ name args _ -> 
-    ExternFun name : concatMap (\C.UExpr { C.uExprExpr = expr } 
-                                             -> c2Args expr) 
-                                        args
+  C.ExternFun   _ name args _ tag -> 
+    (ExternFun name (fromJust tag)) : 
+      concatMap (\C.UExpr { C.uExprExpr = expr } 
+                     -> c2Args expr) 
+                args
 
-  C.ExternArray _ _ name _ _  _ -> [ExternArr name] -- : c2Args_ idx
+  C.ExternArray _ _ name _ _ _ -> [ExternArr name] 
 
   C.Op1 _ e        -> c2Args_ e
 

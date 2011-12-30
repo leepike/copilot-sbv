@@ -21,7 +21,7 @@ import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
+--import qualified Data.SBV.Internals as S
 
 import qualified Data.Map as M
 import Control.Monad (foldM)
@@ -52,8 +52,9 @@ updateStates meta (C.Spec streams _ _) =
         let Just strmInfo = M.lookup id (streamInfoMap meta) 
         updateStreamState1 t1 e' strmInfo
 
-  updateStreamState1 :: C.Type a -> S.SBV a -> StreamInfo -> S.SBVCodeGen ()
-  updateStreamState1 t1 e1 (StreamInfo _ t2) = do
+  updateStreamState1 :: C.Type a -> S.SBV a -> C.Stream -> S.SBVCodeGen ()
+  updateStreamState1 t1 e1 C.Stream { C.streamExprType = t2 }
+    = do
     W.SymWordInst <- return (W.symWordInst t2)
     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t2)
     Just p <- return (t1 =~= t2)
@@ -138,7 +139,7 @@ getExtArrs meta@(MetaTable { externArrInfoMap = arrs })
 
 -- mkInputs takes the datatype containing the entire spec (meta) as well as all
 -- possible arguments to the SBV function generating the expression.  From those
--- arguments, it then generates in the SBVCodeGen monad the actual Inputs ---
+-- arguments, it then generates in the SBVCodeGen monad---the actual Inputs---
 -- the queues to hold streams as well as external variables.
 
 -- XXX MUST be put in the monad in the same order as the function call
@@ -146,10 +147,12 @@ getExtArrs meta@(MetaTable { externArrInfoMap = arrs })
 
 mkInputs :: MetaTable -> [Arg] -> S.SBVCodeGen Inputs
 mkInputs meta args = 
-  foldM argToInput (Inputs [] [] []) args 
+  foldM argToInput (Inputs [] [] [] []) args 
 
   where
   argToInput :: Inputs -> Arg -> S.SBVCodeGen Inputs
+
+-----------------------------------------
  
   -- External variables
   argToInput acc (Extern name) = 
@@ -160,18 +163,10 @@ mkInputs meta args =
     where 
     mkExtInput :: C.ExtVar -> S.SBVCodeGen Inputs
     mkExtInput (C.ExtVar _ C.UType { C.uTypeType = t }) = do
-      ext <- mkExtInput_ t
-      return acc { extVars = (name, (ExtVarInput { extInput = ext 
-                                                 , extType  = t })
-                             ) : extVars acc
-                 }
-
-    mkExtInput_ :: C.Type a -> S.SBVCodeGen (S.SBV a)
-    mkExtInput_ t = do
-     W.SymWordInst        <- return (W.symWordInst t)
-     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-     ext <- S.cgInput (mkExtTmpVar name)
-     return ext
+      ext <- mkExtInput_ t (mkExtTmpVar name)
+      return acc { extVars = (name, (ExtInput { extInput = ext 
+                                              , extType  = t })
+                             ) : extVars acc }
 
 -----------------------------------------
 
@@ -183,28 +178,31 @@ mkInputs meta args =
 
     where 
     mkExtInput :: C.ExtArray -> S.SBVCodeGen Inputs
-    mkExtInput C.ExtArray { C.externArrayElemType = tArr
-                          , C.externArrayIdx      = eIdx
-                          , C.externArrayIdxType  = tIdx
-                          , C.externArraySize     = size
-                          }
+    mkExtInput C.ExtArray { C.externArrayElemType = t }
       = do
-      arr       <- mkExtInput_ tArr size
-      idxInputs <- mkInputs meta (c2Args eIdx)
-      let idx   =  c2sExpr idxInputs eIdx
-      return acc { extArrs = (name, ExtArrInput 
-                                      { extArr      = arr
-                                      , extArrType  = tArr
-                                      , extIdx      = idx
-                                      , extIdxType  = tIdx }
+      v <- mkExtInput_ t (mkExtTmpVar name)
+      return acc { extArrs = (name, ExtInput 
+                                      { extInput  = v
+                                      , extType   = t }
                              ) : extArrs acc }
 
-    mkExtInput_ :: C.Type a -> Int -> S.SBVCodeGen [S.SBV a]
-    mkExtInput_ t size = do
-     W.SymWordInst        <- return (W.symWordInst t)
-     W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-     ext <- S.cgInputArr size (mkExtTmpVar name)
-     return ext
+-----------------------------------------
+
+-- External functions
+  argToInput acc (ExternFun name tag) =
+    let extInfos = externFunInfoMap meta in
+    let Just extInfo = M.lookup name extInfos in
+    mkExtInput extInfo
+
+    where
+    mkExtInput :: C.ExtFun -> S.SBVCodeGen Inputs
+    mkExtInput C.ExtFun { C.externFunType = t }
+      = do
+      v <- mkExtInput_ t (mkExtTmpFun name tag)
+      return acc { extFuns = (name, ExtInput 
+                                      { extInput = v
+                                      , extType  = t }
+                             ) : extFuns acc }
 
 -----------------------------------------
 
@@ -215,9 +213,9 @@ mkInputs meta args =
     mkQueInput strmInfo
 
     where
-    mkQueInput :: StreamInfo -> S.SBVCodeGen Inputs
-    mkQueInput StreamInfo { streamInfoQueue = que
-                          , streamInfoType  = t } = do
+    mkQueInput :: C.Stream -> S.SBVCodeGen Inputs
+    mkQueInput C.Stream { C.streamBuffer = que
+                        , C.streamExprType  = t } = do
       arr <- mkQueInput_ t que
       ptr <- S.cgInput (mkQueuePtrVar id)
 
@@ -235,3 +233,10 @@ mkInputs meta args =
       return arr
 
 -----------------------------------------
+
+mkExtInput_ :: C.Type a -> String -> S.SBVCodeGen (S.SBV a)
+mkExtInput_ t name = do
+  W.SymWordInst        <- return (W.symWordInst t)
+  W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+  ext <- S.cgInput name
+  return ext

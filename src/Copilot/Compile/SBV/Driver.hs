@@ -24,6 +24,7 @@ import Copilot.Compile.SBV.Common
 import Copilot.Compile.SBV.Params
 
 import qualified Copilot.Core as C
+--import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 import qualified Copilot.Core.Type.Show as C (showWithType, ShowType(..))
 import Copilot.Compile.Header.C99 (c99HeaderName)
 
@@ -122,9 +123,9 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     ++ map getQueuePtrVars (map fst $ M.toList streams)
     ++ map getExtVars (M.toList externs)
 
-  getTmpStVars :: (C.Id, StreamInfo) -> Decl
-  getTmpStVars (id, StreamInfo { streamInfoType  = t
-                               , streamInfoQueue = que }) = 
+  getTmpStVars :: (C.Id, C.Stream) -> Decl
+  getTmpStVars (id, C.Stream { C.streamExprType  = t
+                               , C.streamBuffer = que }) = 
     Decl (retType t) (text $ mkTmpStVar id) getFirst
     where 
     -- ASSUME queue is nonempty!
@@ -132,9 +133,9 @@ varDecls meta = vcat $ map varDecl (getVars meta)
     headErr [] = C.impossible "headErr" "copilot-sbv"
     headErr xs = head xs
   
-  getQueueVars :: (C.Id, StreamInfo) -> Decl
-  getQueueVars (id, StreamInfo { streamInfoType = t
-                               , streamInfoQueue = que }) =
+  getQueueVars :: (C.Id, C.Stream) -> Decl
+  getQueueVars (id, C.Stream { C.streamExprType = t
+                             , C.streamBuffer = que }) =
     Decl (retType t) 
          (text (mkQueueVar id) <> lbrack <> int (length que) <> rbrack)
          getInits
@@ -182,25 +183,62 @@ declObservers prfx = vcat . map declObserver
 
 sampleExts :: MetaTable -> Doc
 sampleExts MetaTable { externVarInfoMap = extVMap
-                     , externArrInfoMap = extAMap } 
+                     , externArrInfoMap = extAMap
+                     , externFunInfoMap = extFMap } 
   =
-  mkFunc sampleExtsF $ vcat (extVars ++ extArrs)
+  -- Arrays and functions have to come after vars.  This is because we may use
+  -- the assignment of extVars in the definition of extArrs.  We could write it
+  -- differently, but it's easier.  The Analyzer.hs copilot-core prevents arrays
+  -- or functions from being used in arrays or functions.
+  mkFunc sampleExtsF $ vcat (extVars ++ extArrs ++ extFuns)
 
   where
-  -- Variables
   extVars = map sampleVExt ((fst . unzip . M.toList) extVMap)
   extArrs = map sampleAExt (M.toList extAMap)
+  extFuns = map sampleFExt (M.toList extFMap)
 
-  sampleVExt :: C.Name -> Doc
-  sampleVExt name = text (mkExtTmpVar name) <+> equals <+> text name <> semi
+--------------------------------------------------------------------------------
 
-  -- Arrays
-  sampleAExt :: (C.Name, C.ExtArray) -> Doc
-  sampleAExt (name, C.ExtArray { C.externArrayIdx = idx }) = 
-    text (mkExtTmpVar name) <+> equals <+> text name 
-    <> lbrack <> idxArgs <> rbrack <> semi
-    where 
-    idxArgs = mkFuncCall (mkExtArrFn name) (map text $ collectArgs idx)
+-- Variables
+sampleVExt :: C.Name -> Doc
+sampleVExt name = 
+  text (mkExtTmpVar name) <+> equals <+> text name <> semi
+
+--------------------------------------------------------------------------------
+-- Arrays
+
+-- Currenty, Analyze.hs in copilot-language forbids recurssion in
+-- external arrays or functions (i.e., an external array can't use another
+-- external array to compute it's index), so a lot of what is below isn't
+-- currently necessary.
+sampleAExt :: (C.Name, C.ExtArray) -> Doc
+sampleAExt (name, C.ExtArray { C.externArrayIdx = idx })
+  = 
+  text (mkExtTmpVar name) <+> equals <+> arrIdx name idx
+ 
+  where 
+  arrIdx :: C.Name -> C.Expr a -> Doc
+  arrIdx name' e = 
+    text name' <> lbrack <> idxFCall e <> rbrack <> semi
+
+  -- Ok, because the analyzer disallows arrays or function calls in index
+  -- expressions, and we assign all variables before arrays.
+  idxFCall :: C.Expr a -> Doc
+  idxFCall e = 
+    mkFuncCall (mkExtArrFn name) (map text $ collectArgs e)
+
+--------------------------------------------------------------------------------
+
+-- External functions
+sampleFExt :: (C.Name, C.ExtFun) -> Doc
+sampleFExt (name, C.ExtFun { C.externFunArgs = args })
+  = 
+  text (mkExtTmpVar name) <+> equals <+> text name <> lparen
+    <+> hsep (punctuate comma $ map mkArgCall (zip [(0 :: Int) ..] args))
+    <> rparen <> semi
+
+     where
+     mkArgCall = undefined--  (i, ( C.UType { C.uTypeType = t}
 
 --------------------------------------------------------------------------------
 
@@ -260,7 +298,7 @@ updateBuffers MetaTable { streamInfoMap = strMap }
   mkFunc updateBuffersF $ vcat $ map updateBuf (M.toList strMap)
 
   where
-  updateBuf :: (C.Id, StreamInfo) -> Doc
+  updateBuf :: (C.Id, C.Stream) -> Doc
   updateBuf (id, _) =
     updateFunc (mkQueueVar id) (mkQueuePtrVar id) (mkTmpStVar id)
 
@@ -276,8 +314,8 @@ updatePtrs MetaTable { streamInfoMap = strMap } =
   mkFunc updatePtrsF $ vcat $ map varAndUpdate (M.toList strMap)
 
   where 
-  varAndUpdate :: (C.Id, StreamInfo) -> Doc
-  varAndUpdate (id, StreamInfo { streamInfoQueue = que }) =
+  varAndUpdate :: (C.Id, C.Stream) -> Doc
+  varAndUpdate (id, C.Stream { C.streamBuffer = que }) =
     updateFunc (fromIntegral $ length que) (mkQueuePtrVar id)
 
   -- idx = (idx + 1) % queueSize;
