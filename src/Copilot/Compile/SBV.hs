@@ -4,6 +4,7 @@
 
 module Copilot.Compile.SBV
   ( compile
+  , sbvDirName
   , module Copilot.Compile.SBV.Params
   ) where
 
@@ -23,15 +24,17 @@ import Copilot.Compile.SBV.Params
 
 -- Note: we put everything in a directory named by the dirName.
 
+sbvDirName :: String
+sbvDirName = "copilot-sbv"
+
 compile :: Params -> C.Spec -> IO ()
 compile params spec = do
   let meta    = allocMetaTable spec
-      dirName = withPrefix (prefix params) "copilot"
       sbvName = withPrefix (prefix params) "internal"
   putStrLn "Compiling SBV-generated functions .."
 
   S.compileToCLib
-    (Just dirName)
+    (Just sbvDirName)
     sbvName
     (  updateStates    meta spec
     ++ updateObservers meta spec
@@ -41,16 +44,16 @@ compile params spec = do
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver " ++ driverName params ++ " .."
-  driver params meta spec dirName sbvName
+  driver params meta spec sbvDirName sbvName
 
   putStrLn ""
   putStrLn $ "Generating Copilot header " ++ c99HeaderName (prefix params) ++ " .."
-  genC99Header (prefix params) dirName spec
+  genC99Header (prefix params) sbvDirName spec
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver Makefile rules .."
                ++ makefileName params ++ " .."
-  makefile params dirName sbvName
+  makefile params sbvDirName sbvName
 
   putStrLn "Done."
 
