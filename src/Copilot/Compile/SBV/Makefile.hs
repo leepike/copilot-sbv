@@ -28,7 +28,8 @@ makefile params dir sbvName = do
   wr (text "# Makefile rules for the Copilot driver.")
   wr (text "")
   wr $ text "driver" <> colon 
-        <+> text (driverName params) <+> text fileName <> text ".h"
+        <+> text (driverName params) <+> text fileName <> text ".h" 
+        <+> text "internal.a"
   wr $ text "\t" 
          <> (hsep [ text "$" <> braces (text "CC")
                   , text "$" <> braces (text "CCFLAGS")
