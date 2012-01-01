@@ -90,18 +90,20 @@ driver params meta (C.Spec streams observers _) dir fileName = do
     mkFunc (withPrefix (prefix params) "step")
            (   mkFuncCall sampleExtsF    [] <> semi
             $$ mkFuncCall updateStatesF  [] <> semi
+            $$ mkFuncCall updateBuffersF [] <> semi
+            $$ mkFuncCall updatePtrsF    [] <> semi
             $$ mkFuncCall observersF     [] <> semi
             $$ mkFuncCall triggersF      [] <> semi
-            $$ mkFuncCall updateBuffersF [] <> semi
-            $$ mkFuncCall updatePtrsF    [] <> semi)
+           )
 
   copilot = vcat $ intersperse (text "")
     [ sampleExts meta
     , updateStates streams
-    , fireTriggers meta
-    , updateObservers params meta
     , updateBuffers meta
-    , updatePtrs meta ]
+    , updatePtrs meta 
+    , updateObservers params meta
+    , fireTriggers meta
+    ]
 
 --------------------------------------------------------------------------------
 

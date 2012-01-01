@@ -30,11 +30,12 @@ sbvDirName = "copilot-sbv"
 compile :: Params -> C.Spec -> IO ()
 compile params spec = do
   let meta    = allocMetaTable spec
+      dirName = withPrefix (prefix params) sbvDirName
       sbvName = withPrefix (prefix params) "internal"
   putStrLn "Compiling SBV-generated functions .."
 
   S.compileToCLib
-    (Just sbvDirName)
+    (Just dirName)
     sbvName
     (  updateStates    meta spec
     ++ updateObservers meta spec
@@ -44,16 +45,16 @@ compile params spec = do
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver " ++ driverName params ++ " .."
-  driver params meta spec sbvDirName sbvName
+  driver params meta spec dirName sbvName
 
   putStrLn ""
   putStrLn $ "Generating Copilot header " ++ c99HeaderName (prefix params) ++ " .."
-  genC99Header (prefix params) sbvDirName spec
+  genC99Header (prefix params) dirName spec
 
   putStrLn ""
   putStrLn $ "Generating Copilot driver Makefile rules .."
                ++ makefileName params ++ " .."
-  makefile params sbvDirName sbvName
+  makefile params dirName sbvName
 
   putStrLn "Done."
 
