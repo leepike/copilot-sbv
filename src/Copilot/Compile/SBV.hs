@@ -36,7 +36,7 @@ compile params spec = do
 
   S.compileToCLib
     (Just dirName)
-    sbvName
+    sbvName $ omitSBVDriver
     (  updateStates    meta spec
     ++ updateObservers meta spec
     ++ fireTriggers    meta spec 
@@ -57,5 +57,12 @@ compile params spec = do
   makefile params dirName sbvName
 
   putStrLn "Done."
+
+--------------------------------------------------------------------------------
+
+omitSBVDriver :: [(a, S.SBVCodeGen ())] -> [(a, S.SBVCodeGen ())]
+omitSBVDriver = map omit 
+  where
+  omit (a, cg) = (a, S.cgGenerateDriver False >> cg)
 
 --------------------------------------------------------------------------------
