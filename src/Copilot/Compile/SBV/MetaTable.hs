@@ -24,10 +24,10 @@ module Copilot.Compile.SBV.MetaTable
 
 import Copilot.Compile.SBV.Common
 import qualified Copilot.Core as C
+import Copilot.Core.Error (impossible)
 
 import Data.Map (Map)
 import Data.List (nub)
-import Data.Maybe (fromJust)
 import qualified Data.Map as M
 import Prelude hiding (id)
 
@@ -135,15 +135,15 @@ allocObserver C.Observer { C.observerName = name
 -- Kinds of arguments to SBV functions
 data Arg = Extern    C.Name
          | ExternFun C.Name C.Tag
-         | ExternArr C.Name
+         | ExternArr C.Name C.Tag
          | Queue     C.Id
   deriving Eq
 
 -- | Normal argument calls.
 argToCall :: Arg -> [String]
 argToCall (Extern name)        = [mkExtTmpVar name]
-argToCall (ExternArr name)     = [mkExtTmpVar name]
-argToCall (ExternFun name tag) = [mkExtTmpFun name tag]
+argToCall (ExternArr name tag) = [mkExtTmpTag name (Just tag)]
+argToCall (ExternFun name tag) = [mkExtTmpTag name (Just tag)]
 argToCall (Queue id)           = [ mkQueueVar id 
                                  , mkQueuePtrVar id ]
 
@@ -181,17 +181,21 @@ c2Args_ e0 = case e0 of
   C.ExternVar   _ name _ -> [Extern name]
 
   C.ExternFun   _ name args _ tag -> 
-    (ExternFun name (fromJust tag)) : 
+    (ExternFun name (just tag)) : 
       concatMap (\C.UExpr { C.uExprExpr = expr } 
                      -> c2Args expr) 
                 args
 
-  C.ExternArray _ _ name _ _ _ _  -> [ExternArr name] 
+  C.ExternArray _ _ name _ _ _ tag  -> [ExternArr name (just tag)] 
 
   C.Op1 _ e        -> c2Args_ e
 
   C.Op2 _ e1 e2    -> c2Args_ e1 ++ c2Args_ e2
 
   C.Op3 _ e1 e2 e3 -> c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3
+
+  where just tag = case tag of
+                     Nothing -> impossible "c2Args" "copilot-sbv"
+                     Just t  -> t
 
 --------------------------------------------------------------------------------

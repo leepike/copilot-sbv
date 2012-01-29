@@ -8,7 +8,6 @@ module Copilot.Compile.SBV.Copilot2SBV
   ( c2sExpr
   , Inputs(..)
   , Ext
---  , ExtArr
   , ExtQue
   , ExtInput(..)
   , QueInput(..)
@@ -59,11 +58,6 @@ data QueueIn a = QueueIn
 
 --------------------------------------------------------------------------------
 
-c2sExpr :: Inputs -> C.Expr a -> S.SBV a
-c2sExpr inputs e = c2sExpr_ e M.empty inputs
-
---------------------------------------------------------------------------------
-
 data Local = forall a . Local
   { localSBVExpr :: S.SBV a
   , localType    :: C.Type a }
@@ -77,6 +71,11 @@ lookupInput id prs =
   case lookup id prs of
     Nothing   -> impossible "lookupInput" "copilot-sbv"
     Just val  -> val
+
+--------------------------------------------------------------------------------
+
+c2sExpr :: Inputs -> C.Expr a -> S.SBV a
+c2sExpr inputs e = c2sExpr_ e M.empty inputs
 
 --------------------------------------------------------------------------------
 

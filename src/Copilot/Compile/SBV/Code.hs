@@ -10,6 +10,7 @@ module Copilot.Compile.SBV.Code
   , updateObservers
   , fireTriggers
   , getExtArrs
+  , getExtFuns
   ) where
 
 import Copilot.Compile.SBV.Copilot2SBV
@@ -21,7 +22,6 @@ import qualified Copilot.Core as C
 import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 
 import qualified Data.SBV as S
---import qualified Data.SBV.Internals as S
 
 import qualified Data.Map as M
 import Control.Monad (foldM)
@@ -94,24 +94,26 @@ fireTriggers meta (C.Spec _ _ triggers) =
                      , C.triggerGuard = guard
                      , C.triggerArgs  = args } =
       mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
-    : map (mkTriggerArg name) (mkTriggerArgIdx args)
+    : map (mkArgCall meta name) (mkArgIdx args)
     where
     mkSBVExp = do
       inputs <- mkInputs meta (c2Args guard)
       let e = c2sExpr inputs guard
       S.cgReturn e
 
-  mkTriggerArg :: String -> (Int, C.UExpr) -> SBVFunc
-  mkTriggerArg name (i, C.UExpr { C.uExprExpr = e
+--------------------------------------------------------------------------------
+
+mkArgCall :: MetaTable -> String -> (Int, C.UExpr) -> SBVFunc
+mkArgCall meta name (i, C.UExpr { C.uExprExpr = e
                                 , C.uExprType = t } ) =
-    mkSBVFunc (mkTriggerArgFn i name) mkExpr
-    where
-    mkExpr = do
-      inputs <- mkInputs meta (c2Args e)
-      let e' = c2sExpr inputs e
-      W.SymWordInst <- return (W.symWordInst t)
-      W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
-      S.cgReturn e'
+  mkSBVFunc (mkTriggerArgFn i name) mkExpr
+  where
+  mkExpr = do
+    inputs <- mkInputs meta (c2Args e)
+    let e' = c2sExpr inputs e
+    W.SymWordInst <- return (W.symWordInst t)
+    W.HasSignAndSizeInst <- return (W.hasSignAndSizeInst t)
+    S.cgReturn e'
 
 --------------------------------------------------------------------------------
 
@@ -137,6 +139,20 @@ getExtArrs meta@(MetaTable { externArrInfoMap = arrs })
 
 --------------------------------------------------------------------------------
 
+-- Generate an SBV function that calculates the Copilot expression to get the
+-- next index to sample an external array.
+getExtFuns :: MetaTable -> [SBVFunc]
+getExtFuns meta@(MetaTable { externFunInfoMap = exts })
+  = concatMap mkExtF (M.toList exts)
+  
+  where
+  mkExtF :: (C.Name, C.ExtFun) -> [SBVFunc]
+  mkExtF (name, C.ExtFun { C.externFunArgs = args })
+    = 
+    map (mkArgCall meta name) (mkArgIdx args)
+
+--------------------------------------------------------------------------------
+
 -- mkInputs takes the datatype containing the entire spec (meta) as well as all
 -- possible arguments to the SBV function generating the expression.  From those
 -- arguments, it then generates in the SBVCodeGen monad---the actual Inputs---
@@ -152,7 +168,7 @@ mkInputs meta args =
   where
   argToInput :: Inputs -> Arg -> S.SBVCodeGen Inputs
 
------------------------------------------
+  -----------------------------------------
  
   -- External variables
   argToInput acc (Extern name) = 
@@ -168,10 +184,10 @@ mkInputs meta args =
                                               , extType  = t })
                              ) : extVars acc }
 
------------------------------------------
+  -----------------------------------------
 
--- External arrays
-  argToInput acc (ExternArr name) = 
+  -- External arrays
+  argToInput acc (ExternArr name tag) = 
     let extInfos = externArrInfoMap meta in
     let Just extInfo = M.lookup name extInfos in
     mkExtInput extInfo
@@ -180,15 +196,15 @@ mkInputs meta args =
     mkExtInput :: C.ExtArray -> S.SBVCodeGen Inputs
     mkExtInput C.ExtArray { C.externArrayElemType = t }
       = do
-      v <- mkExtInput_ t (mkExtTmpVar name)
+      v <- mkExtInput_ t (mkExtTmpTag name (Just tag))
       return acc { extArrs = (name, ExtInput 
                                       { extInput  = v
                                       , extType   = t }
                              ) : extArrs acc }
 
------------------------------------------
+  -----------------------------------------
 
--- External functions
+  -- External functions
   argToInput acc (ExternFun name tag) =
     let extInfos = externFunInfoMap meta in
     let Just extInfo = M.lookup name extInfos in
@@ -198,15 +214,15 @@ mkInputs meta args =
     mkExtInput :: C.ExtFun -> S.SBVCodeGen Inputs
     mkExtInput C.ExtFun { C.externFunType = t }
       = do
-      v <- mkExtInput_ t (mkExtTmpFun name tag)
+      v <- mkExtInput_ t (mkExtTmpTag name (Just tag))
       return acc { extFuns = (name, ExtInput 
                                       { extInput = v
                                       , extType  = t }
                              ) : extFuns acc }
 
------------------------------------------
+  -----------------------------------------
 
--- Stream queues
+  -- Stream queues
   argToInput acc (Queue id) =
     let strmInfos = streamInfoMap meta in
     let Just strmInfo = M.lookup id strmInfos in

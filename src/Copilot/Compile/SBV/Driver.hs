@@ -5,7 +5,9 @@
 {-# LANGUAGE ExistentialQuantification, GADTs #-}
 
 -- | Generates the code around the SBV functions to hold the state-updates,
--- external variables, etc.
+-- external variables, etc.  Note: this just creates calls to SBV-generated
+-- functions, it does not create them!  (Use the names from Common.hs to ensure
+-- agreement on names.)
 
 module Copilot.Compile.SBV.Driver
   ( driver
@@ -24,7 +26,6 @@ import Copilot.Compile.SBV.Common
 import Copilot.Compile.SBV.Params
 
 import qualified Copilot.Core as C
---import Copilot.Core.Type.Equality ((=~=), coerce, cong)
 import qualified Copilot.Core.Type.Show as C (showWithType, ShowType(..))
 import Copilot.Compile.Header.C99 (c99HeaderName)
 
@@ -209,19 +210,18 @@ sampleVExt name =
 --------------------------------------------------------------------------------
 -- Arrays
 
--- Currenty, Analyze.hs in copilot-language forbids recurssion in
--- external arrays or functions (i.e., an external array can't use another
--- external array to compute it's index), so a lot of what is below isn't
--- currently necessary.
+-- Currenty, Analyze.hs in copilot-language forbids recurssion in external
+-- arrays or functions (i.e., an external array can't use another external array
+-- to compute it's index).
 sampleAExt :: (C.Name, C.ExtArray) -> Doc
-sampleAExt (name, C.ExtArray { C.externArrayIdx = idx })
+sampleAExt (name, C.ExtArray { C.externArrayIdx = idx 
+                             , C.externArrayTag = t   })
   = 
-  text (mkExtTmpVar name) <+> equals <+> arrIdx name idx
+  text (mkExtTmpTag name t) <+> equals <+> arrIdx name idx
  
   where 
   arrIdx :: C.Name -> C.Expr a -> Doc
-  arrIdx name' e = 
-    text name' <> lbrack <> idxFCall e <> rbrack <> semi
+  arrIdx name' e = text name' <> lbrack <> idxFCall e <> rbrack <> semi
 
   -- Ok, because the analyzer disallows arrays or function calls in index
   -- expressions, and we assign all variables before arrays.
@@ -233,14 +233,17 @@ sampleAExt (name, C.ExtArray { C.externArrayIdx = idx })
 
 -- External functions
 sampleFExt :: (C.Name, C.ExtFun) -> Doc
-sampleFExt (name, C.ExtFun { C.externFunArgs = args })
+sampleFExt (name, C.ExtFun { C.externFunArgs = args 
+                           , C.externFunTag  = tag  })
   = 
-  text (mkExtTmpVar name) <+> equals <+> text name <> lparen
-    <+> hsep (punctuate comma $ map mkArgCall (zip [(0 :: Int) ..] args))
+  text (mkExtTmpTag name tag) <+> equals <+> text name <> lparen
+    <> hsep (punctuate comma $ map mkArgCall (zip [(0 :: Int) ..] args))
     <> rparen <> semi
 
      where
-     mkArgCall = undefined--  (i, ( C.UType { C.uTypeType = t}
+     mkArgCall :: (Int, C.UExpr) -> Doc 
+     mkArgCall (i, C.UExpr { C.uExprExpr = e }) = 
+       mkFuncCall (mkExtFunArgFn i name tag) (map text $ collectArgs e)
 
 --------------------------------------------------------------------------------
 
@@ -281,16 +284,18 @@ fireTriggers MetaTable { triggerInfoMap = triggers }
   fireTrig (name, TriggerInfo { guardArgs      = gArgs
                               , triggerArgArgs = argArgs }) 
     = 
-    let f = mkFuncCall name (map mkArg (mkTriggerArgIdx argArgs)) <> semi in
     text "if" <+> lparen <> guardF <> rparen $+$ nest 2 f
 
     where
+    f = mkFuncCall name (map mkArg (mkArgIdx argArgs)) <> semi 
+
     guardF :: Doc
     guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
 
     mkArg :: (Int, [String]) -> Doc
     mkArg (i, args) =
-      mkFuncCall (mkTriggerArgFn i name) (map text args)
+      text (mkTriggerArgFn i name) <>
+        lparen <> vsep (punctuate (map text args)) <> rparen
 
 --------------------------------------------------------------------------------
 

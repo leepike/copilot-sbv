@@ -4,6 +4,7 @@
 
 module Copilot.Compile.SBV
   ( compile
+  , compileWithSBV
   , sbvDirName
   , module Copilot.Compile.SBV.Params
   ) where
@@ -16,7 +17,7 @@ import qualified Data.SBV as S
 import Copilot.Compile.SBV.Driver (driver, driverName)
 import Copilot.Compile.SBV.Makefile (makefile, makefileName)
 import Copilot.Compile.SBV.Code 
-  (updateStates, updateObservers, fireTriggers, getExtArrs)
+  (updateStates, updateObservers, fireTriggers, getExtArrs, getExtFuns)
 import Copilot.Compile.SBV.MetaTable (allocMetaTable)
 import Copilot.Compile.SBV.Params
 
@@ -30,7 +31,11 @@ sbvDirName :: String
 sbvDirName = "copilot-sbv-codegen"
 
 compile :: Params -> C.Spec -> IO ()
-compile params spec = do
+compile p s = compileWithSBV p s []
+
+-- | sbvs are optional additional SBVCodeGens to generate.
+compileWithSBV :: Params -> C.Spec -> [(String, S.SBVCodeGen ())] -> IO ()
+compileWithSBV params spec0 sbvs = do
   let meta    = allocMetaTable spec
       dirName = withPrefix (prefix params) sbvDirName
       sbvName = withPrefix (prefix params) "internal"
@@ -43,6 +48,8 @@ compile params spec = do
     ++ updateObservers meta spec
     ++ fireTriggers    meta spec 
     ++ getExtArrs      meta 
+    ++ getExtFuns      meta 
+    ++ sbvs
     )
 
   putStrLn ""
@@ -64,6 +71,8 @@ compile params spec = do
   putStrLn ""
 
   putStrLn "Done."
+
+  where spec = C.makeTags spec0
 
 --------------------------------------------------------------------------------
 
