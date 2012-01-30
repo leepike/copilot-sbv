@@ -94,8 +94,9 @@ fireTriggers meta (C.Spec _ _ triggers) =
                      , C.triggerGuard = guard
                      , C.triggerArgs  = args } =
       mkSBVFunc (mkTriggerGuardFn name) mkSBVExp
-    : map (mkArgCall meta name) (mkArgIdx args)
+    : map go (mkArgIdx args)
     where
+    go (i,e) = mkArgCall meta (mkTriggerArgFn i name) e
     mkSBVExp = do
       inputs <- mkInputs meta (c2Args guard)
       let e = c2sExpr inputs guard
@@ -103,10 +104,11 @@ fireTriggers meta (C.Spec _ _ triggers) =
 
 --------------------------------------------------------------------------------
 
-mkArgCall :: MetaTable -> String -> (Int, C.UExpr) -> SBVFunc
-mkArgCall meta name (i, C.UExpr { C.uExprExpr = e
-                                , C.uExprType = t } ) =
-  mkSBVFunc (mkTriggerArgFn i name) mkExpr
+mkArgCall :: MetaTable -> String -> C.UExpr -> SBVFunc
+mkArgCall meta fnCallName C.UExpr { C.uExprExpr = e
+                            , C.uExprType = t } 
+  =
+  mkSBVFunc fnCallName mkExpr
   where
   mkExpr = do
     inputs <- mkInputs meta (c2Args e)
@@ -124,9 +126,10 @@ getExtArrs meta@(MetaTable { externArrInfoMap = arrs })
   = map mkIdx (M.toList arrs)
   
   where
-  mkIdx :: (C.Name, C.ExtArray) -> SBVFunc
-  mkIdx (name, C.ExtArray { C.externArrayIdx     = idx
-                          , C.externArrayIdxType = t   })
+  mkIdx :: (Int, C.ExtArray) -> SBVFunc
+  mkIdx (_, C.ExtArray { C.externArrayName    = name
+                       , C.externArrayIdx     = idx
+                       , C.externArrayIdxType = t    })
     = 
     mkSBVFunc (mkExtArrFn name) mkSBVExpr
     where
@@ -146,10 +149,14 @@ getExtFuns meta@(MetaTable { externFunInfoMap = exts })
   = concatMap mkExtF (M.toList exts)
   
   where
-  mkExtF :: (C.Name, C.ExtFun) -> [SBVFunc]
-  mkExtF (name, C.ExtFun { C.externFunArgs = args })
+  mkExtF :: (Int, C.ExtFun) -> [SBVFunc]
+  mkExtF (_, C.ExtFun { C.externFunName = name
+                      , C.externFunTag  = tag
+                      , C.externFunArgs = args })
     = 
-    map (mkArgCall meta name) (mkArgIdx args)
+    map go (mkArgIdx args)
+    where
+    go (i,e) = mkArgCall meta (mkExtFunArgFn i name tag) e
 
 --------------------------------------------------------------------------------
 
@@ -189,7 +196,7 @@ mkInputs meta args =
   -- External arrays
   argToInput acc (ExternArr name tag) = 
     let extInfos = externArrInfoMap meta in
-    let Just extInfo = M.lookup name extInfos in
+    let Just extInfo = M.lookup tag extInfos in
     mkExtInput extInfo
 
     where 
@@ -207,7 +214,7 @@ mkInputs meta args =
   -- External functions
   argToInput acc (ExternFun name tag) =
     let extInfos = externFunInfoMap meta in
-    let Just extInfo = M.lookup name extInfos in
+    let Just extInfo = M.lookup tag extInfos in
     mkExtInput extInfo
 
     where

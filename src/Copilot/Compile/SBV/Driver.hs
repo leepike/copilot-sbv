@@ -72,9 +72,11 @@ driver params meta (C.Spec streams observers _) dir fileName = do
   wr (text "#include" <+> doubleQuotes (text $ c99HeaderName (prefix params)))
   wr (text "")
 
+  wr (text "/* Observers */")
   wr (declObservers (prefix params) observers)
   wr (text "")
 
+  wr (text "/* Variables */")
   wr (varDecls meta)
   wr (text "")
 
@@ -119,12 +121,19 @@ varDecls meta = vcat $ map varDecl (getVars meta)
 
   where
   getVars :: MetaTable -> [Decl] 
-  getVars MetaTable { streamInfoMap = streams 
-                    , externVarInfoMap = externs } = 
-       map getTmpStVars (M.toList streams)
-    ++ map getQueueVars (M.toList streams)
-    ++ map getQueuePtrVars (map fst $ M.toList streams)
+  getVars MetaTable { streamInfoMap    = streams 
+                    , externVarInfoMap = externs 
+                    , externArrInfoMap = externArrs
+                    , externFunInfoMap = externFuns }
+    = 
+       map getTmpStVars strLst
+    ++ map getQueueVars strLst
+    ++ map getQueuePtrVars (map fst strLst)
     ++ map getExtVars (M.toList externs)
+    ++ map getExtArrs (M.toList externArrs)
+    ++ map getExtFuns (M.toList externFuns)
+    where
+    strLst = M.toList streams
 
   getTmpStVars :: (C.Id, C.Stream) -> Decl
   getTmpStVars (id, C.Stream { C.streamExprType  = t
@@ -160,6 +169,20 @@ varDecls meta = vcat $ map varDecl (getVars meta)
   getExtVars (var, C.ExtVar _ (C.UType { C.uTypeType = t })) = 
     Decl (retType t) (text $ mkExtTmpVar var) (int 0)
 
+  getExtArrs :: (Int, C.ExtArray) -> Decl 
+  getExtArrs (_, C.ExtArray { C.externArrayName     = name
+                            , C.externArrayElemType = t 
+                            , C.externArrayTag      = tag  })
+    =
+    Decl (retType t) (text $ mkExtTmpTag name tag) (int 0)
+
+  getExtFuns :: (Int, C.ExtFun) -> Decl
+  getExtFuns (_, C.ExtFun { C.externFunName = name
+                          , C.externFunType = t
+                          , C.externFunTag  = tag  })
+    =
+    Decl (retType t) (text $ mkExtTmpTag name tag) (int 0)
+
   varDecl :: Decl -> Doc
   varDecl Decl { retT = t, declVar = v, initVal = i } =
     t <+> v <+> equals <+> i <> semi
@@ -190,9 +213,9 @@ sampleExts MetaTable { externVarInfoMap = extVMap
                      , externFunInfoMap = extFMap } 
   =
   -- Arrays and functions have to come after vars.  This is because we may use
-  -- the assignment of extVars in the definition of extArrs.  We could write it
-  -- differently, but it's easier.  The Analyzer.hs copilot-core prevents arrays
-  -- or functions from being used in arrays or functions.
+  -- the assignment of extVars in the definition of extArrs.  The Analyzer.hs
+  -- copilot-core prevents arrays or functions from being used in arrays or
+  -- functions.
   mkFunc sampleExtsF $ vcat (extVars ++ extArrs ++ extFuns)
 
   where
@@ -213,9 +236,10 @@ sampleVExt name =
 -- Currenty, Analyze.hs in copilot-language forbids recurssion in external
 -- arrays or functions (i.e., an external array can't use another external array
 -- to compute it's index).
-sampleAExt :: (C.Name, C.ExtArray) -> Doc
-sampleAExt (name, C.ExtArray { C.externArrayIdx = idx 
-                             , C.externArrayTag = t   })
+sampleAExt :: (Int, C.ExtArray) -> Doc
+sampleAExt (_, C.ExtArray { C.externArrayName = name
+                          , C.externArrayIdx = idx 
+                          , C.externArrayTag = t     })
   = 
   text (mkExtTmpTag name t) <+> equals <+> arrIdx name idx
  
@@ -232,9 +256,10 @@ sampleAExt (name, C.ExtArray { C.externArrayIdx = idx
 --------------------------------------------------------------------------------
 
 -- External functions
-sampleFExt :: (C.Name, C.ExtFun) -> Doc
-sampleFExt (name, C.ExtFun { C.externFunArgs = args 
-                           , C.externFunTag  = tag  })
+sampleFExt :: (Int, C.ExtFun) -> Doc
+sampleFExt (_, C.ExtFun { C.externFunName = name
+                        , C.externFunArgs = args 
+                        , C.externFunTag  = tag  })
   = 
   text (mkExtTmpTag name tag) <+> equals <+> text name <> lparen
     <> hsep (punctuate comma $ map mkArgCall (zip [(0 :: Int) ..] args))
@@ -287,15 +312,15 @@ fireTriggers MetaTable { triggerInfoMap = triggers }
     text "if" <+> lparen <> guardF <> rparen $+$ nest 2 f
 
     where
-    f = mkFuncCall name (map mkArg (mkArgIdx argArgs)) <> semi 
+    f = text name <> lparen 
+          <> vcat (punctuate comma $ map mkArg (mkArgIdx argArgs)) 
+          <> rparen <> semi 
 
     guardF :: Doc
     guardF = mkFuncCall (mkTriggerGuardFn name) (map text gArgs)
 
     mkArg :: (Int, [String]) -> Doc
-    mkArg (i, args) =
-      text (mkTriggerArgFn i name) <>
-        lparen <> vsep (punctuate (map text args)) <> rparen
+    mkArg (i, args) = mkFuncCall (mkTriggerArgFn i name) (map text args)
 
 --------------------------------------------------------------------------------
 

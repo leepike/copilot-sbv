@@ -5,11 +5,9 @@
 {-# LANGUAGE ExistentialQuantification, GADTs #-}
 
 module Copilot.Compile.SBV.MetaTable
-  ( --StreamInfo (..)
-    StreamInfoMap
+  ( StreamInfoMap
   , ExternVarInfoMap
   , ExternArrInfoMap
---  , ExternFunInfo (..)
   , ExternFunInfoMap
   , TriggerInfo (..)
   , TriggerInfoMap
@@ -24,7 +22,6 @@ module Copilot.Compile.SBV.MetaTable
 
 import Copilot.Compile.SBV.Common
 import qualified Copilot.Core as C
-import Copilot.Core.Error (impossible)
 
 import Data.Map (Map)
 import Data.List (nub)
@@ -35,8 +32,8 @@ import Prelude hiding (id)
 
 type StreamInfoMap = Map C.Id C.Stream
 type ExternVarInfoMap = Map C.Name C.ExtVar
-type ExternArrInfoMap = Map C.Name C.ExtArray
-type ExternFunInfoMap = Map C.Name C.ExtFun
+type ExternArrInfoMap = Map C.Tag C.ExtArray
+type ExternFunInfoMap = Map C.Tag C.ExtFun
 
 --------------------------------------------------------------------------------
 
@@ -67,45 +64,40 @@ data MetaTable = MetaTable
 
 allocMetaTable :: C.Spec -> MetaTable
 allocMetaTable spec =
-  let
-    streamInfoMap_    = M.fromList $ map allocStream     (C.specStreams spec)
-    externVarInfoMap_ = M.fromList $ map allocExternVars (C.externVars spec)
-    externArrInfoMap_ = M.fromList $ map allocExternArrs (C.externArrays spec)
-    externFunInfoMap_ = M.fromList $ map allocExternFuns (C.externFuns spec)
-    triggerInfoMap_   = M.fromList $ map allocTrigger    (C.specTriggers spec)
-    observerInfoMap_  = M.fromList $ map allocObserver   (C.specObservers spec)
-  in
-    MetaTable { streamInfoMap    = streamInfoMap_
-              , externVarInfoMap = externVarInfoMap_
-              , externArrInfoMap = externArrInfoMap_
-              , externFunInfoMap = externFunInfoMap_
-              , triggerInfoMap   = triggerInfoMap_
-              , observerInfoMap  = observerInfoMap_
-              }
+  MetaTable { streamInfoMap    = streamInfoMap_
+            , externVarInfoMap = externVarInfoMap_
+            , externArrInfoMap = externArrInfoMap_
+            , externFunInfoMap = externFunInfoMap_
+            , triggerInfoMap   = triggerInfoMap_
+            , observerInfoMap  = observerInfoMap_ }
+
+  where
+  streamInfoMap_    = M.fromList $ map allocStream     (C.specStreams spec)
+  externVarInfoMap_ = M.fromList $ map allocExternVars (C.externVars spec)
+  externArrInfoMap_ = M.fromList $ map allocExternArrs (C.externArrays spec)
+  externFunInfoMap_ = M.fromList $ map allocExternFuns (C.externFuns spec)
+  triggerInfoMap_   = M.fromList $ map allocTrigger    (C.specTriggers spec)
+  observerInfoMap_  = M.fromList $ map allocObserver   (C.specObservers spec)
       
 --------------------------------------------------------------------------------
 
 allocStream :: C.Stream -> (C.Id, C.Stream)
-allocStream strm = 
-  (C.streamId strm, strm)
+allocStream strm = (C.streamId strm, strm)
 
 --------------------------------------------------------------------------------
 
 allocExternVars :: C.ExtVar -> (C.Name, C.ExtVar)
-allocExternVars var =
-  (C.externVarName var, var)
+allocExternVars var = (C.externVarName var, var)
 
 --------------------------------------------------------------------------------
 
-allocExternArrs :: C.ExtArray -> (C.Name, C.ExtArray)
-allocExternArrs arr =
-  (C.externArrayName arr, arr)
+allocExternArrs :: C.ExtArray -> (C.Tag, C.ExtArray)
+allocExternArrs arr = (tagExtract $ C.externArrayTag arr, arr)
 
 --------------------------------------------------------------------------------
 
-allocExternFuns :: C.ExtFun -> (C.Name, C.ExtFun)
-allocExternFuns fun =
-  (C.externFunName fun, fun)
+allocExternFuns :: C.ExtFun -> (C.Tag, C.ExtFun)
+allocExternFuns fun = (tagExtract $ C.externFunTag fun, fun)
 
 --------------------------------------------------------------------------------
 
@@ -181,21 +173,17 @@ c2Args_ e0 = case e0 of
   C.ExternVar   _ name _ -> [Extern name]
 
   C.ExternFun   _ name args _ tag -> 
-    (ExternFun name (just tag)) : 
+    (ExternFun name (tagExtract tag)) : 
       concatMap (\C.UExpr { C.uExprExpr = expr } 
                      -> c2Args expr) 
                 args
 
-  C.ExternArray _ _ name _ _ _ tag  -> [ExternArr name (just tag)] 
+  C.ExternArray _ _ name _ _ _ tag  -> [ExternArr name (tagExtract tag)] 
 
   C.Op1 _ e        -> c2Args_ e
 
   C.Op2 _ e1 e2    -> c2Args_ e1 ++ c2Args_ e2
 
   C.Op3 _ e1 e2 e3 -> c2Args_ e1 ++ c2Args_ e2 ++ c2Args_ e3
-
-  where just tag = case tag of
-                     Nothing -> impossible "c2Args" "copilot-sbv"
-                     Just t  -> t
 
 --------------------------------------------------------------------------------
