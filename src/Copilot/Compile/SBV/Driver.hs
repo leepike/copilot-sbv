@@ -101,11 +101,11 @@ driver params meta (C.Spec streams observers _) dir fileName = do
 
   copilot = vcat $ intersperse (text "")
     [ sampleExts meta
+    , fireTriggers meta
+    , updateObservers params meta
     , updateStates streams
     , updateBuffers meta
     , updatePtrs meta 
-    , updateObservers params meta
-    , fireTriggers meta
     ]
 
 --------------------------------------------------------------------------------
