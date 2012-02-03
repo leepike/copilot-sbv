@@ -31,11 +31,11 @@ sbvDirName :: String
 sbvDirName = "copilot-sbv-codegen"
 
 compile :: Params -> C.Spec -> IO ()
-compile p s = compileWithSBV p s []
+compile p s = compileWithSBV p [] s
 
 -- | sbvs are optional additional SBVCodeGens to generate.
-compileWithSBV :: Params -> C.Spec -> [(String, S.SBVCodeGen ())] -> IO ()
-compileWithSBV params spec0 sbvs = do
+compileWithSBV :: Params -> [(String, S.SBVCodeGen ())] -> C.Spec -> IO ()
+compileWithSBV params sbvs spec0 = do
   let meta    = allocMetaTable spec
       dirName = withPrefix (prefix params) sbvDirName
       sbvName = withPrefix (prefix params) "internal"
