@@ -28,17 +28,19 @@ makefile params dir sbvName = do
   wr (text "# Makefile rules for the Copilot driver.")
   wr (text "")
   wr $ text "driver" <> colon 
-        <+> text (driverName params) <+> text fileName <> text ".h" 
-        <+> text "internal.a"
+        <+> text (driverName params) <+> text (withPre fileName) <> text ".h" 
+        <+> archive
   wr $ text "\t" 
          <> (hsep [ text "$" <> braces (text "CC")
                   , text "$" <> braces (text "CCFLAGS")
                   , text "$<"
                   , text "-o"
                   , text "$@"
-                  , text sbvName <> text ".a"])
+                  , archive])
 
   where 
+  archive = text sbvName <> text ".a"
+  withPre nm = withPrefix (prefix params) nm
   mkStyle :: Doc -> String
   mkStyle = renderStyle (style {lineLength = 80})
 
