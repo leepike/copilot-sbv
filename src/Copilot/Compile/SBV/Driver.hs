@@ -92,11 +92,11 @@ driver params meta (C.Spec streams observers _) dir fileName = do
   driverFn =
     mkFunc (withPrefix (prefix params) "step")
            (   mkFuncCall sampleExtsF    [] <> semi
+            $$ mkFuncCall triggersF      [] <> semi
+            $$ mkFuncCall observersF     [] <> semi
             $$ mkFuncCall updateStatesF  [] <> semi
             $$ mkFuncCall updateBuffersF [] <> semi
             $$ mkFuncCall updatePtrsF    [] <> semi
-            $$ mkFuncCall observersF     [] <> semi
-            $$ mkFuncCall triggersF      [] <> semi
            )
 
   copilot = vcat $ intersperse (text "")
