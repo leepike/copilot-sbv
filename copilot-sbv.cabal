@@ -1,6 +1,6 @@
 cabal-version             : >= 1.10
 name                      : copilot-sbv
-version                   : 0.3
+version                   : 0.4
 synopsis                  : A compiler for CoPilot targeting SBV.
 description               : Blah blah blah...
 license                   : BSD3
