@@ -30,7 +30,7 @@ author                    : Lee Pike
 
 source-repository head
     type:       git
-    location:   git://github.com/niswegmann/copilot-sbv.git
+    location:   http://github.com/leepike/copilot-sbv.git
 
 library
   default-language        : Haskell2010
@@ -38,7 +38,7 @@ library
   ghc-options             : -Wall -fwarn-tabs
   ghc-prof-options        : -auto-all -caf-all
 
-  build-depends           : sbv >= 1.0
+  build-depends           : sbv >= 1.0 && <= 1.3
                           , base >= 4.3 && < 5
                           , containers >= 0.4
                           , copilot-core
