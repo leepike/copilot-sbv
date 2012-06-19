@@ -17,7 +17,6 @@ module Copilot.Compile.SBV.Witness
   ) where
 
 import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
 import qualified Copilot.Core as C
 
 import Data.Word (Word8, Word16, Word32, Word64)
@@ -61,7 +60,7 @@ numInst t =
 
 --------------------------------------------------------------------------------
 
-data HasSignAndSizeInst a = S.HasSignAndSize a => HasSignAndSizeInst
+data HasSignAndSizeInst a = S.SymWord a => HasSignAndSizeInst
 
 hasSignAndSizeInst :: C.Type a -> HasSignAndSizeInst a
 hasSignAndSizeInst t =
