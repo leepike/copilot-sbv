@@ -12,7 +12,6 @@ module Copilot.Compile.SBV.Queue
 
 import Prelude hiding (id, rem)
 import qualified Data.SBV as S
-import qualified Data.SBV.Internals as S
 
 import Copilot.Core.Expr (DropIdx)
 import Copilot.Core.Error (impossible)
@@ -26,8 +25,7 @@ data Queue a = Queue
 
 --------------------------------------------------------------------------------
 
-lookahead :: (S.HasSignAndSize a, S.SymWord a) 
-          => DropIdx -> [S.SBV a] -> S.SBV QueueSize -> S.SBV a
+lookahead :: (S.SymWord a) => DropIdx -> [S.SBV a] -> S.SBV QueueSize -> S.SBV a
 lookahead i buf ptr = 
   let sz = fromIntegral $ length buf in
   let (_, rem) = (ptr + fromIntegral i) `S.bvQuotRem` sz in
