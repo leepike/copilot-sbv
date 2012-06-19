@@ -1,6 +1,6 @@
 cabal-version             : >= 1.10
 name                      : copilot-sbv
-version                   : 0.6
+version                   : 0.7
 synopsis                  : A compiler for CoPilot targeting SBV.
 description               : 
   The Copilot back-end targeting SBV <http://hackage.haskell.org/package/sbv>.
