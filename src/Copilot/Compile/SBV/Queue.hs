@@ -28,7 +28,7 @@ data Queue a = Queue
 lookahead :: (S.SymWord a) => DropIdx -> [S.SBV a] -> S.SBV QueueSize -> S.SBV a
 lookahead i buf ptr = 
   let sz = fromIntegral $ length buf in
-  let (_, rem) = (ptr + fromIntegral i) `S.bvQuotRem` sz in
+  let (_, rem) = (ptr + fromIntegral i) `S.sQuotRem` sz in
   let defaultVal = if null buf 
                      then impossible "lookahead" "copilot-sbv"
                      else head buf                    in
