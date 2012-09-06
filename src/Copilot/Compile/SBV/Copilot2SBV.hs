@@ -252,9 +252,9 @@ c2sOp2 op = case op of
   Gt    t -> case W.ordInst      t of W.OrdInst        ->  (S..>)
 
   Div   t -> case W.divInst      t of W.BVDivisibleInst  ->  
-                                                  \x y -> fst (S.bvQuotRem x y)
+                                                  \x y -> fst (S.sQuotRem x y)
   Mod   t -> case W.divInst      t of W.BVDivisibleInst  ->  
-                                                  \x y -> snd (S.bvQuotRem x y)
+                                                  \x y -> snd (S.sQuotRem x y)
 
   BwAnd t -> case W.bitsInst     t of W.BitsInst       -> (S..&.)
   BwOr  t -> case W.bitsInst     t of W.BitsInst       -> (S..|.)

@@ -94,7 +94,7 @@ eqInst t =
 
 --------------------------------------------------------------------------------
 
-data BVDivisibleInst a = S.BVDivisible (S.SBV a) => BVDivisibleInst
+data BVDivisibleInst a = S.SDivisible (S.SBV a) => BVDivisibleInst
 
 divInst :: C.Type a -> BVDivisibleInst a
 divInst t =
