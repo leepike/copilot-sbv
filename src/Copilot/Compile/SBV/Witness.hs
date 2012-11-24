@@ -26,7 +26,7 @@ import Data.Bits
 --------------------------------------------------------------------------------
 
 badInst :: a
-badInst = C.impossible "witnesses" "copilot-sbv"
+badInst =  error "Fatal cast in the witnesses of SBV in copilot-sbv.  Are you sure that SBV supports the type you are using?  (It doesn't support floats or doubles.)  If you you are, or you don't understand the error, email leepike @ gmail . com (remove spaces) or file a bug report on github.com"
 
 --------------------------------------------------------------------------------
 
@@ -100,10 +100,10 @@ divInst :: C.Type a -> BVDivisibleInst a
 divInst t =
   case t of
     C.Bool   -> badInst
-    C.Int8   -> badInst
-    C.Int16  -> badInst
-    C.Int32  -> badInst
-    C.Int64  -> badInst
+    C.Int8   -> BVDivisibleInst
+    C.Int16  -> BVDivisibleInst
+    C.Int32  -> BVDivisibleInst
+    C.Int64  -> BVDivisibleInst
     C.Word8  -> BVDivisibleInst
     C.Word16 -> BVDivisibleInst
     C.Word32 -> BVDivisibleInst
