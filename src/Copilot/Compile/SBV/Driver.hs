@@ -53,7 +53,7 @@ mkFuncCall f args = text f <> lparen <> mkArgs args <> rparen
 --------------------------------------------------------------------------------
 
 driver :: Params -> MetaTable -> C.Spec -> String -> String -> IO ()
-driver params meta (C.Spec streams observers _) dir fileName = do
+driver params meta (C.Spec streams observers _ _) dir fileName = do
   let filePath = dir ++ '/' : driverName params
   h <- I.openFile filePath I.WriteMode
   let wr doc = I.hPutStrLn h (mkStyle doc)
