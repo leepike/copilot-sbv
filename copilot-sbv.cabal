@@ -38,8 +38,8 @@ library
   ghc-options             : -Wall -fwarn-tabs
   ghc-prof-options        : -auto-all -caf-all
 
-  build-depends           : sbv >= 2.4
-                          , base >= 4.0 && <= 5.0
+  build-depends           : sbv >= 2.1
+                          , base >= 4.0
                           , containers >= 0.4
                           , copilot-core >= 0.2.4
                           , pretty >= 1
